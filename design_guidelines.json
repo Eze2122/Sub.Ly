@@ -1,0 +1,121 @@
+{
+  "app_name": "Subly",
+  "personality": "1 iOS-Native Clean with 6 Glass / Luxe premium finishes",
+  "personality_one_liner": "Order, trust, and financial precision delivered through clean typography and a premium dark-navy hero experience.",
+  "color": {
+    "surface": "#F8FAFC", 
+    "onSurface": "#0F172A",
+    "surfaceSecondary": "#FFFFFF", 
+    "onSurfaceSecondary": "#0F172A",
+    "surfaceTertiary": "#F1F5F9", 
+    "onSurfaceTertiary": "#334155",
+    "surfaceInverse": "#0F172A", 
+    "onSurfaceInverse": "#F8FAFC",
+    "brand": "#0B1528",
+    "onBrand": "#FFFFFF",
+    "brandPrimary": "#059669", 
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#1E293B", 
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#D1FAE5", 
+    "onBrandTertiary": "#065F46",
+    "success": "#10B981", 
+    "onSuccess": "#FFFFFF",
+    "warning": "#F59E0B", 
+    "onWarning": "#FFFFFF",
+    "error": "#EF4444", 
+    "onError": "#FFFFFF",
+    "info": "#3B82F6", 
+    "onInfo": "#FFFFFF",
+    "border": "#E2E8F0", 
+    "borderStrong": "#CBD5E1", 
+    "divider": "#F1F5F9",
+    "muted": "#64748B"
+  },
+  "typography": {
+    "displayFontFamily": "PlusJakartaSans",
+    "textFontFamily": "PlusJakartaSans",
+    "scale": { "sm": 12, "base": 14, "lg": 16, "xl": 20, "2xl": 24 }
+  },
+  "spacing": { 
+    "rule": "Handle spacing correctly dont have extra spaces where its not required, handle padding and margin corectly and subtle for buttons and components", 
+    "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24, "2xl": 32, "3xl": 48 
+  },
+  "radius_tokens": { "sm": 6, "md": 12, "lg": 20, "pill": 999 },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Ionicons",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": ["Use on bottom tab bar", "Use on sticky headers over scrolling content", "Use on hero cards placed over the navy background"],
+    "dont's": ["Don't use on list items", "Don't use on standard form inputs"]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Splash",
+      "purpose": "First impression conveying privacy and financial control.",
+      "states": { "loading": "Show original logo and custom graphic symbol on navy background with mint details", "empty": "", "error": "" },
+      "layout": "Full bleed navy (#0B1528) background. Center the Subly wordmark and custom subscription graphic symbol. Mint green subtle accents or progress indicator. Minimalist, premium feel."
+    },
+    {
+      "name": "Dashboard",
+      "purpose": "Provide a high-priority summary of monthly spend, upcoming payments, and alert statuses.",
+      "states": { "loading": "Centered spinner over navy hero area", "empty": "Mint abstract illustration with prompt to add first service", "error": "Clear message to retry data fetch" },
+      "layout": "Top section (navy hero area extending behind the header): Monthly spend, upcoming renewal count, and overdue alert chips. Main body (overlapping the hero area with glassmorphism or white cards): Subscription list sorted by next billing date with category chips. Secondary area: Horizontal calendar scroll for expirations and a pie/bar chart for category distribution. Bottom right: Quick add FAB."
+    },
+    {
+      "name": "ServiceList",
+      "purpose": "CRUD interface for all subscriptions and services with robust filtering.",
+      "states": { "loading": "Skeleton rows", "empty": "Illustration indicating no services match the current filter", "error": "Retry loading services" },
+      "layout": "Header with search bar and filter chips (Active, Paused, Free Trial). List layout: Each row features the service logo/icon in a tinted container, name, billing frequency, and next payment date. Use clear semantic colors for statuses (e.g., green for paid, orange for soon, red for overdue)."
+    },
+    {
+      "name": "ServiceDetail",
+      "purpose": "Deep dive into a specific service, payment history, and manual exchange rate settings.",
+      "states": { "loading": "Skeleton card", "empty": "No payment history yet", "error": "Retry loading details" },
+      "layout": "Cover banner with service-branded color or dark navy. Title section with logo. Details card: Frequency, Category, State, Cost, and equivalent in main currency. Payment History list. Actions: Edit, Mark Paid, Cancel."
+    },
+    {
+      "name": "Paywall",
+      "purpose": "Convert users to the premium plan (US$2/mo or annual) with a clean, trust-building presentation.",
+      "states": { "loading": "Spinner", "empty": "", "error": "Retry loading subscription options" },
+      "layout": "Hero/value headline: 'Tus pagos, bajo control.' Short supporting copy with 3 benefit bullets. Plan cards: Show monthly and annual (annual visually emphasized/pre-selected). Trust signals near the bottom (Cancel anytime, 7-day free trial). Single prominent mint green CTA: 'Start free trial'. Close icon in top right."
+    }
+  ],
+  "images": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1629197521865-4946b4acd2b0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHwyfHxkYXJrJTIwbmF2eSUyMGJsdWUlMjBtaW5pbWFsaXN0JTIwYWJzdHJhY3QlMjB0ZXh0dXJlfGVufDB8fHx8MTc5MTg1MzE4M3ww&ixlib=rb-4.1.0&q=85",
+      "dark": "https://images.unsplash.com/photo-1597773150796-e5c14ebecbf5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHwxfHxkYXJrJTIwbmF2eSUyMGJsdWUlMjBtaW5pbWFsaXN0JTIwYWJzdHJhY3QlMjB0ZXh0dXJlfGVufDB8fHx8MTc5MTg1MzE4M3ww&ixlib=rb-4.1.0&q=85",
+      "alt": "Dark navy blue minimalist abstract texture"
+    },
+    "empty_state_illustration": {
+      "url": "https://images.unsplash.com/photo-1693389107440-afe980ccbb8d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDZ8MHwxfHNlYXJjaHwxfHxtaW50JTIwZ3JlZW4lMjBzb2Z0JTIwYWJzdHJhY3R8ZW58MHx8fHwxNzkxODUzMTgyfDA&ixlib=rb-4.1.0&q=85",
+      "dark": "https://images.unsplash.com/photo-1603277578692-c699f37c67d3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDZ8MHwxfHNlYXJjaHwxfHxtaW50JTIwZ3JlZW4lMjBzb2Z0JTIwYWJzdHJhY3R8ZW58MHx8fHwxNzkxODUzMTgyfDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Mint green soft abstract empty state"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Implement a premium 'iOS-Native Clean' architecture infused with 'Glass / Luxe' elevated finishes.",
+    "Limit to 4 tabs max: Dashboard, Services, Calendar, Settings.",
+    "Use 'PlusJakartaSans' for a clean, modern, tabular numeric feel essential for a finance app.",
+    "The primary color is explicitly dark navy (#0B1528) and action is mint green (#059669) as specifically requested by the user. Do not use generic AI purples/blues.",
+    "The Dashboard must have a navy hero area at the top holding the summary metrics, with content cards overlapping it (with glass effect on iOS) to create depth.",
+    "Ensure 'Tus pagos, bajo control.' and other UI copy is in Spanish (Argentina) as specified.",
+    "Implement an explicit paywall pattern: Hero value proposition, 2 plan cards (Annual pre-selected), trust text, and a sticky bottom mint green CTA for the 7-day trial.",
+    "Avoid emojis entirely in the UI. Use a professional, clean icon set (Ionicons).",
+    "For service list items, default to real logo PNGs. If unavailable, use a `brandTertiary` rounded square container for initials/icons.",
+    "Ensure Loading, Empty, and Error states exist for every data-fetching screen and occupy flex: 1 with centered layout."
+  ]
+}

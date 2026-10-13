@@ -1,0 +1,35 @@
+{
+  "summary": "First test run for Subly. Backend pytest 15/15 passed and public endpoints verified (health 200, billing/config returns configured:false with missing list, verify returns 503 when not configured and 422 on invalid body). Frontend end-to-end flows all working on mobile viewport 390x844: dashboard empty state, create service with amount '15.990,50' parsed correctly, both ARS and USD monthly totals shown separately (dashboard-monthly-ARS 15.990,50 / dashboard-monthly-USD 9,99), confirm payment advances next due (13 oct -> 13 nov) and adds history, cancel+reactivate flow via bottom sheets, overdue service with past date triggers 'Atrasado' state and dashboard-overdue section. Reports tab shows per-currency estimates with reports-missing-rates notice; after adding USD->ARS rate 1200 via rate-sheet, converted total 27.978,50 is computed and notice disappears. Backup screen exposes CSV export, enforces password >=8 and mismatch errors. Gmail and Premium screens render pending/unavailable notices correctly, premium-close works. Privacy screen renders. No Emergent branding on any screen. Persistence via localStorage key 'subly.state' confirmed across page reloads. Modo desarrollo notice present as expected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "N/A", "issue": "FastAPI on_event startup/shutdown handlers are deprecated (warning only); migrate to lifespan context manager at /app/backend/server.py:302 and :310"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_billing.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Review request lists some example testIDs that don't match implementation (functionality works, but naming differs): services-view-list/grid vs. actual status-based services-view-{all|active|pending|paid|overdue|trial|cancelled}; settings-notif-day-before/same-day vs. actual settings-notif-{d7|d3|d1|d0|overdue|trialEnd}; premium-buy/premium-restore vs. actual premium-buy-button/premium-restore-button. No code change required; just align docs or testIDs if desired.",
+    "Optional: migrate backend @app.on_event handlers to FastAPI lifespan (deprecation warning only)."
+  ],
+  "critical_code_review_comments": [
+    "Backend server.py is well-structured (~310 lines), uses async/await for DB and HTTP, excludes Mongo _id via BaseDocument.to_mongo, validates input with Pydantic, uses env vars only (no hardcoded secrets), returns proper 400/401/403/503/422 status codes, rate-limits /billing/verify.",
+    "Pydantic constraints on VerifyIn.purchaseToken (min 10 chars) are enforced before auth, hence 422 for 'short' token when server not configured (expected behavior).",
+    "premium-buy-button is only rendered when offer is loaded; with billing not configured there is no offer so the button is absent (not merely disabled). Matches 'buy disabled' intent but main agent may want to render it disabled explicitly for discoverability."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Transient test data (Netflix ARS, Spotify USD, Old Bill overdue, PersistTest) created via UI during testing; stored only in browser localStorage subly.state and cleared when the automation browser context is closed. No backend DB rows created.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "App persists state in browser localStorage under key 'subly.state'. Each playwright invocation starts a fresh context so previously-created services from an earlier tool call will not be visible; create data within the same session to test flows. Public URL: https://subly-preview-1.preview.emergentagent.com. Mobile viewport 390x844. The in-app tab bar's 'tab-home' may fail click() when another full-screen view is layered; prefer page.goto('/') to switch to dashboard. Date picker exposes 'service-form-next-due-today' and day cells 'service-form-next-due-calendar-day-YYYY-MM-DD'; a previous-month arrow 'service-form-next-due-prev-month' is available to pick past dates.",
+  "rca_of_issue": "No bugs found. Verified reproducibility of key flows end-to-end; billing endpoints return the documented 503/422 responses because PLAY_* env vars are intentionally unset in this environment."
+}
