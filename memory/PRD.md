@@ -22,3 +22,6 @@ Expo SDK 57 + expo-router; dominio puro en `src/domain`; store JSON versionado l
 - P0: Client ID OAuth Android + Gmail API + consentimiento; producto de suscripción y oferta 7 días en Play Console; cuenta de servicio Play; build Android y prueba real.
 - P1: RTDN Pub/Sub; verificación OAuth de Google para alcance restringido; publicar política de privacidad.
 - P2: sincronización entre dispositivos; widgets; tipos de cambio sugeridos.
+
+## Cambios (jun 2026)
+- Identificador Android definitivo `com.eze2122.subly` (app.json: android.package + scheme). Prebuild Android verificado (applicationId/namespace/scheme/app_name). iOS bundleIdentifier sin cambios.

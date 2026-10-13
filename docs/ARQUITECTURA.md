@@ -42,6 +42,7 @@ cd backend && python -m pytest tests
 ```
 
 ## Compilar APK/AAB
+Identificador Android: `com.eze2122.subly` (`app.json`). El proyecto usa Continuous Native Generation: no hay carpetas `android/` ni `ios/` versionadas; se generan en cada compilación a partir de `app.json`, así que no hay archivos nativos que regenerar a mano. Cualquier compilación previa con el identificador anterior se instala como **otra app**: hace falta una compilación nueva.
 Gmail OAuth, Billing, tareas en segundo plano y notificaciones requieren una **compilación nativa** (no Expo Go).
 1. Configurá las variables (ver `.env.example`).
 2. En Emergent: botón **Publish** (arriba a la derecha) → generar compilación Android (APK para pruebas internas, AAB para Play Console).

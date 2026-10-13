@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": ["subly", "com.emergent.sublypreview.w9uzyp"],
+    "scheme": ["subly", "com.eze2122.subly"],
     "userInterfaceStyle": "light",
     "backgroundColor": "#0B1528",
     "ios": {
@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/images/adaptive-mono.png",
         "backgroundColor": "#0B1528"
       },
-      "package": "com.emergent.sublypreview.w9uzyp",
+      "package": "com.eze2122.subly",
       "allowBackup": false,
       "permissions": ["android.permission.POST_NOTIFICATIONS", "android.permission.RECEIVE_BOOT_COMPLETED", "com.android.vending.BILLING"],
       "blockedPermissions": [

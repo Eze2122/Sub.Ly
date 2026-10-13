@@ -20,7 +20,8 @@ Fecha: junio 2026. Estado **honesto**: nada externo está declarado como operati
 ## Datos que todavía tenés que proporcionar
 | Dato | Dónde se configura |
 |---|---|
-| Nombre de paquete definitivo (opcional cambiarlo) | `frontend/app.json` → `android.package`, `scheme` |
+| Nombre de paquete definitivo: **`com.eze2122.subly`** (ya configurado) | `frontend/app.json` → `android.package`, `scheme` |
+| Variable del backend con el mismo paquete | `backend/.env` o secretos → `PLAY_PACKAGE_NAME=com.eze2122.subly` |
 | SHA-1 / SHA-256 de las firmas | Google Cloud → cliente OAuth Android |
 | Client ID OAuth Android | `frontend/.env` → `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` |
 | URL de política de privacidad publicada | Pantalla de consentimiento OAuth y ficha de Play |

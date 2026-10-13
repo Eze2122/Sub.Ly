@@ -28,12 +28,14 @@ En [console.cloud.google.com](https://console.cloud.google.com) → *APIs y serv
 5. Mientras la app esté en *Prueba*, agregá las cuentas de Gmail de prueba en **Usuarios de prueba** (máx. 100).
 
 ## 3. Nombre de paquete Android definitivo
-- Hoy está en `frontend/app.json` → `expo.android.package` = `com.emergent.sublypreview.w9uzyp` (identificador asignado por la plataforma de compilación de Emergent).
-- Si querés uno propio (ej. `com.tuempresa.subly`), cambialo **antes** de crear la app en Play Console y los clientes OAuth, porque **no puede modificarse** después de publicar. Cambiá también el segundo valor de `expo.scheme` en `app.json` para que coincida (se usa como esquema de redirección OAuth).
+- Identificador definitivo: **`com.eze2122.subly`**, en `frontend/app.json` → `expo.android.package`. El segundo valor de `expo.scheme` es el mismo identificador (se usa como esquema de redirección OAuth).
+- Usalo exactamente igual al crear la app en Play Console y el cliente OAuth Android. Después de publicar en Google Play **no puede modificarse**.
+- `ios.bundleIdentifier` no se modificó (Subly apunta a Android). Si más adelante publicás en iOS, definilo aparte.
 
 ## 4. Huellas SHA-1 y SHA-256
 Se necesitan para el cliente OAuth Android (SHA-1) y es recomendable registrar ambas.
-- **Compilaciones de Emergent/EAS (desarrollo y producción):** el panel de compilación muestra el keystore usado; también podés obtenerlas con `keytool -list -v -keystore <archivo.jks> -alias <alias>`.
+- **Compilaciones generadas con Publish (Emergent/EAS):** la firma la gestiona la plataforma. Después de generar la compilación Android, pedí las credenciales de firma (keystore) desde el panel de compilación o a support@emergent.sh, y obtené la huella con `keytool -list -v -keystore <archivo.jks> -alias <alias>` (líneas `SHA1:` y `SHA256:`).
+- **Desde el APK instalable de prueba** (sin acceso al keystore): `apksigner verify --print-certs subly.apk` (Android SDK build-tools) o `keytool -printcert -jarfile subly.apk`. Esta es la huella del APK que vas a instalar para probar Gmail OAuth.
 - **App publicada en Google Play:** Play Console → *Prueba y lanzamiento → Configuración → Integridad de la app → Certificado de la clave de firma de apps*. Esa es la huella que ve el usuario final; registrala también.
 - Si usás compilaciones locales: `cd android && ./gradlew signingReport`.
 Creá **un cliente Android por cada huella** (debug/upload/app-signing) que vayas a usar.
@@ -49,7 +51,7 @@ Creá **un cliente Android por cada huella** (debug/upload/app-signing) que vaya
 No es necesario para esta arquitectura (ver tabla inicial). No crearlo evita exponer un client secret.
 
 ## 7. URI de redirección
-- Valor real: **`<android.package>:/oauth2redirect`** → hoy: `com.emergent.sublypreview.w9uzyp:/oauth2redirect`.
+- Valor real: **`<android.package>:/oauth2redirect`** → hoy: `com.eze2122.subly:/oauth2redirect`.
 - Los clientes Android no tienen campo de "URI autorizados": Google valida paquete + firma + esquema personalizado. No hay orígenes JavaScript.
 
 ## 8. Permisos de Gmail y justificación
