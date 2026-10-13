@@ -1,0 +1,29 @@
+{
+  "summary": "Regression check after Expo SDK 57 dep update, app.json identifier -> com.eze2122.subly, and expo-notifications monochrome icon addition. Backend: 15/15 pytest green and public URL endpoints verified (health 200, billing/config configured:false with missing list, billing/verify not-configured -> 503, invalid body -> 422). Frontend on 390x844 mobile viewport: app loads clean with no red screen, all tabs (home/services/reports/settings) navigate. Create service (RegSvc2, $1.234,00, today) works; confirm payment via service-detail-confirm-payment + pay-sheet-confirm advances next due 13 oct 2026 -> 13 nov 2026 and records 'Pagado 13 oct 2026 · vencía 13 oct 2026' in Historial de pagos. Persistence after reload: service survived. Reports tab exposes reports-estimates / reports-estimate-ARS / reports-converted-monthly as expected. Premium screen shows 'Sin suscripción' and 'Google Play Billing pendiente de configuración', no fake purchase. Dashboard shows 'Modo desarrollo' subscription badge. Gmail screen shows 'No conectado' + 'Disponible en Android' + 'La conexión con Gmail está disponible en la app de Android' pending notice, no fake 'Conectado'. Backup screen: CSV export present, password validation enforces '8 caracteres' minimum and 'Las contraseñas no coinciden' mismatch error. No Emergent branding on /, /premium, /gmail, /backup, /currencies, /privacy. app.json identifiers correctly com.eze2122.subly for both iOS bundleIdentifier and Android package; expo-notifications plugin has monochrome icon ./assets/images/adaptive-mono.png.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "web runtime warnings", "issue": "Web preview logs non-blocking RN-Web warnings: 'shadow* style props are deprecated. Use boxShadow' and 'props.pointerEvents is deprecated. Use style.pointerEvents' and useNativeDriver fallback. Harmless for native build but worth suppressing where possible for cleaner logs."}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_billing.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Nothing blocking. Optional: silence RN-Web deprecation warnings (shadow*, pointerEvents) in web-targeted styles.",
+    "Previous iteration flagged on_event deprecation; this iteration confirms server.py already migrated to @asynccontextmanager lifespan - resolved."
+  ],
+  "critical_code_review_comments": [
+    "Backend server.py already uses lifespan context manager (prior warning cleared).",
+    "app.json: iOS bundleIdentifier and Android package both set to com.eze2122.subly; scheme includes both 'subly' and 'com.eze2122.subly'; expo-notifications plugin has monochrome icon + color configured; expo-iap and expo-background-task plugins present.",
+    "Billing stays pending-config (PLAY_* env vars intentionally unset); server behavior matches spec (503 verify, 403/400 on forged/wrong product once configured)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Transient browser-local test services created via UI (localStorage key 'subly.state'); cleared when automation context closed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL: https://subly-preview-1.preview.emergentagent.com. Frontend env uses EXPO_PUBLIC_BACKEND_URL. Mobile viewport 390x844. After successful service creation the app auto-navigates to the service detail page, so do not search dashboard list for the just-created item - just call confirm-payment directly. Backup testids: backup-export-csv, backup-password, backup-password-confirm, backup-create, backup-pick-file. Premium: 'Sin suscripción' + pending-configuration notice; premium-buy-button IS rendered (regression from iter 1 note). Gmail: 'No conectado' + 'Disponible en Android' pending notice. Web preview logs harmless RN-Web shadow*/pointerEvents deprecation warnings.",
+  "rca_of_issue": "No bugs. Dependency bump and identifier change are backward compatible; all public contracts and UI flows unchanged."
+}

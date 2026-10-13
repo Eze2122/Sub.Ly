@@ -25,3 +25,4 @@ Expo SDK 57 + expo-router; dominio puro en `src/domain`; store JSON versionado l
 
 ## Cambios (jun 2026)
 - Identificador Android definitivo `com.eze2122.subly` (app.json: android.package + scheme). Prebuild Android verificado (applicationId/namespace/scheme/app_name). iOS bundleIdentifier sin cambios.
+- Auditoría pre-publicación: iOS bundleIdentifier unificado, icono de notificación monocromo, deps Expo parche actualizadas, prebuild + bundle Android verificados, regresión e2e OK.

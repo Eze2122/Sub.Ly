@@ -10,7 +10,7 @@
     "backgroundColor": "#0B1528",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.sublypreview.w9uzyp"
+      "bundleIdentifier": "com.eze2122.subly"
     },
     "android": {
       "adaptiveIcon": {
@@ -56,6 +56,7 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/images/adaptive-mono.png",
           "color": "#059669"
         }
       ],

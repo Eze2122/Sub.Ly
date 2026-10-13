@@ -30,7 +30,7 @@ En [console.cloud.google.com](https://console.cloud.google.com) → *APIs y serv
 ## 3. Nombre de paquete Android definitivo
 - Identificador definitivo: **`com.eze2122.subly`**, en `frontend/app.json` → `expo.android.package`. El segundo valor de `expo.scheme` es el mismo identificador (se usa como esquema de redirección OAuth).
 - Usalo exactamente igual al crear la app en Play Console y el cliente OAuth Android. Después de publicar en Google Play **no puede modificarse**.
-- `ios.bundleIdentifier` no se modificó (Subly apunta a Android). Si más adelante publicás en iOS, definilo aparte.
+- `ios.bundleIdentifier` también es `com.eze2122.subly` por coherencia (Subly se publica primero en Android).
 
 ## 4. Huellas SHA-1 y SHA-256
 Se necesitan para el cliente OAuth Android (SHA-1) y es recomendable registrar ambas.

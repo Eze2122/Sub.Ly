@@ -45,3 +45,9 @@ OAuth real, lectura real de Gmail, compras y restauración en Google Play, RTDN,
 
 ## Resultados del agente de pruebas (UI web 390x844, iteración 1)
 Todos los flujos probados pasaron: estado vacío sin datos ficticios; alta de servicio (importe `15.990,50`), validaciones; totales ARS y USD separados; confirmar pago (13 oct → 13 nov + historial); cancelar/reactivar/eliminar con hojas de confirmación; estado Atrasado; búsqueda y filtros; reportes con aviso de tipo de cambio faltante y total convertido tras cargar USD→ARS; preferencias de notificación; Gmail y Premium muestran "pendiente de configuración" sin simular conexión/compra; CSV y validaciones de contraseña de copias; persistencia tras recargar; sin marca de Emergent. Backend: health, config, verify 503/422.
+
+## Auditoría previa a publicación (iteración 2)
+- Identificador `com.eze2122.subly` en `android.package`, `ios.bundleIdentifier` y `scheme`; prebuild Android local OK (applicationId/namespace correctos, `allowBackup=false`, permisos innecesarios removidos, icono de notificación monocromo).
+- Bundle JavaScript de Android exportado sin errores (`expo export --platform android --no-bytecode`). El paso de bytecode Hermes no se pudo ejecutar en este contenedor (arquitectura aarch64 vs. binario x86-64); no es un problema del proyecto, pero solo se confirma en la compilación real.
+- Dependencias alineadas con Expo SDK 57 (`expo install --check` OK). TypeScript sin errores. Tests: frontend 12/12, backend 15/15, UI e2e (agente de pruebas) OK.
+- Sin referencias al paquete anterior ni recursos de Emergent en código, recursos ni bundle.
