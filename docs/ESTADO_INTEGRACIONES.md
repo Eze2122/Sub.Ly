@@ -4,7 +4,7 @@ Fecha: junio 2026. Estado **honesto**: nada externo está declarado como operati
 
 | Integración | Código | Configuración externa | Probado con credenciales reales |
 |---|---|---|---|
-| Google OAuth (PKCE, Android) | Implementado (`frontend/src/gmail/oauth.ts`) | **Pendiente**: Client ID Android | **No** |
+| Gmail OAuth nativo (`AuthorizationClient`, solo `gmail.readonly`) | Implementado (`frontend/modules/subly-google-auth`, `frontend/src/gmail/oauth.ts`) | **Pendiente**: cliente OAuth Android (paquete + SHA-1), consentimiento en Testing | **No** (no compilado ni probado en dispositivo) |
 | Gmail API (lectura, análisis 12 meses, incremental, sugerencias, dedupe) | Implementado (`frontend/src/gmail/sync.ts`, `src/domain/gmailParser.ts`) | **Pendiente**: Gmail API habilitada + consentimiento | **No** (heurísticas probadas con correos simulados en tests unitarios) |
 | Sincronización diaria (WorkManager vía `expo-background-task`) | Implementado (`frontend/src/gmail/background.ts`) | Requiere compilación Android | **No** |
 | Google Play Billing (`expo-iap`) | Implementado (`frontend/src/billing/iap.ts`, `app/premium.tsx`) | **Pendiente**: producto + oferta en Play Console | **No** |
@@ -23,8 +23,8 @@ Fecha: junio 2026. Estado **honesto**: nada externo está declarado como operati
 | Nombre de paquete definitivo: **`com.eze2122.subly`** (ya configurado) | `frontend/app.json` → `android.package`, `scheme` |
 | Variable del backend con el mismo paquete | `backend/.env` o secretos → `PLAY_PACKAGE_NAME=com.eze2122.subly` |
 | SHA-1 / SHA-256 de las firmas | Google Cloud → cliente OAuth Android |
-| Client ID OAuth Android | `frontend/.env` → `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` |
-| URL de política de privacidad publicada | Pantalla de consentimiento OAuth y ficha de Play |
+| Cliente OAuth Android (paquete + SHA-1) | Solo en Google Cloud; la app no necesita Client ID |
+| Política pública: https://eze2122.github.io/-subly-privacy/privacy.html (subir `docs/privacy.html` actualizado) | Pantalla de consentimiento OAuth y ficha de Play |
 | ID del producto de suscripción | `backend/.env` → `PLAY_SUBSCRIPTION_ID` |
 | Paquete para validación | `backend/.env` → `PLAY_PACKAGE_NAME` |
 | Clave JSON de la cuenta de servicio | Archivo fuera del repo; ruta en `PLAY_SERVICE_ACCOUNT_FILE` |
@@ -51,3 +51,9 @@ Todos los flujos probados pasaron: estado vacío sin datos ficticios; alta de se
 - Bundle JavaScript de Android exportado sin errores (`expo export --platform android --no-bytecode`). El paso de bytecode Hermes no se pudo ejecutar en este contenedor (arquitectura aarch64 vs. binario x86-64); no es un problema del proyecto, pero solo se confirma en la compilación real.
 - Dependencias alineadas con Expo SDK 57 (`expo install --check` OK). TypeScript sin errores. Tests: frontend 12/12, backend 15/15, UI e2e (agente de pruebas) OK.
 - Sin referencias al paquete anterior ni recursos de Emergent en código, recursos ni bundle.
+
+## Cambios (iteración 3)
+- OAuth por navegador (expo-auth-session, esquema personalizado) reemplazado por módulo nativo con `AuthorizationClient`; permiso `email` eliminado. Dependencia `expo-auth-session` removida.
+- Política reescrita (`docs/privacy.html`, `docs/POLITICA_PRIVACIDAD.md`, pantalla en la app desde `src/domain/privacyPolicy.ts`) con declaración Limited Use.
+- Alerta de ahorro en Reportes basada solo en el uso declarado por el usuario.
+- El código Kotlin del módulo **no se compiló** (sin compilación autorizada); se verificará en la compilación final.

@@ -98,3 +98,19 @@ export function dueDatesInMonth(services: Service[], year: number, month: number
   }
   return map;
 }
+
+/**
+ * Savings estimate based ONLY on usage declared by the user. Annual cost uses the
+ * amount, currency and frequency of each active recurring service (per currency).
+ */
+export function savingsSummary(services: Service[], today: string) {
+  const recurring = services.filter((s) => !s.cancelled && s.frequency !== "once" && (!s.endDate || s.endDate >= today));
+  const low = recurring
+    .filter((s) => s.usage === "low")
+    .map((s) => ({ s, annual: Math.round(monthlyEquivalent(s) * 12) }))
+    .sort((a, b) => b.annual - a.annual);
+  const annualLow: CurrencyTotals = {};
+  for (const x of low) addTo(annualLow, x.s.currency, x.annual);
+  const unrated = recurring.filter((s) => !s.usage);
+  return { low, annualLow, unrated, recurringCount: recurring.length };
+}

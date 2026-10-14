@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Linking, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -15,7 +15,7 @@ import { formatMoney } from "@/src/domain/money.ts";
 import { createService, dismissSuggestion, removeGmailRecords, suggestionToInput } from "@/src/domain/operations.ts";
 import { FREQUENCIES } from "@/src/domain/types.ts";
 import { disableDailySync, enableDailySync } from "@/src/gmail/background";
-import { exchangeCode, oauthAvailability, revokeAndClear, useGmailAuthRequest } from "@/src/gmail/oauth.ts";
+import { authorizeInteractive, oauthAvailability, oauthErrorMessage, revokeAndClear } from "@/src/gmail/oauth.ts";
 import { fetchProfileEmail, runSync } from "@/src/gmail/sync.ts";
 import { spacing, useTheme } from "@/src/theme";
 
@@ -28,50 +28,29 @@ export default function GmailScreen() {
   const canEdit = useCanEdit();
   const run = usePremiumAction();
   const avail = oauthAvailability();
-  const [request, response, promptAsync] = useGmailAuthRequest();
   const [busy, setBusy] = useState<null | "connect" | "sync" | "disconnect">(null);
   const [discOpen, setDiscOpen] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
   const g = st.gmail;
 
-  useEffect(() => {
-    if (!response) return;
-    if (response.type === "cancel" || response.type === "dismiss") {
-      setBusy(null);
-      setOauthError("Cancelaste la autorización. Podés seguir usando Subly manualmente.");
-      return;
-    }
-    if (response.type === "error") {
-      setBusy(null);
-      const code = response.params?.error ?? response.error?.code ?? "";
-      setOauthError(code === "access_denied" ? "No otorgaste acceso a Gmail. Subly sigue funcionando en modo manual." : `Google devolvió un error de autorización (${code || "desconocido"}). Revisá la configuración de OAuth.`);
-      return;
-    }
-    if (response.type !== "success" || !request?.codeVerifier) return;
-    (async () => {
-      try {
-        await exchangeCode(response.params.code, request.codeVerifier!);
-        const email = await fetchProfileEmail();
-        await commit((s) => ({ ...s, gmail: { ...s.gmail, connected: true, email, connectedAt: now(), lastSyncStatus: "idle", lastError: null } }));
-        await enableDailySync();
-        setOauthError(null);
-        toast("Gmail conectado. Analizando los últimos 12 meses…");
-        setBusy("sync");
-        const r = await runSync();
-        toast(r.ok ? `Análisis completo: ${r.created} registros creados, ${r.suggested} sugerencias.` : r.error ?? "Error", r.ok ? "success" : "error");
-      } catch {
-        setOauthError("No se pudo completar la conexión con Google. Intentá nuevamente.");
-      } finally {
-        setBusy(null);
-      }
-    })();
-  }, [response, request, toast]);
-
   const connect = async () => {
     if (!canEdit) return router.push("/premium");
     setOauthError(null);
     setBusy("connect");
-    await promptAsync();
+    try {
+      await authorizeInteractive();
+      const email = await fetchProfileEmail();
+      await commit((s) => ({ ...s, gmail: { ...s.gmail, connected: true, email, connectedAt: s.gmail.connectedAt ?? now(), lastSyncStatus: "idle", lastError: null } }));
+      await enableDailySync();
+      toast("Gmail conectado. Analizando los últimos 12 meses…");
+      setBusy("sync");
+      const r = await runSync();
+      toast(r.ok ? `Análisis completo: ${r.created} registros creados, ${r.suggested} sugerencias.` : r.error ?? "Error", r.ok ? "success" : "error");
+    } catch (e) {
+      setOauthError(oauthErrorMessage(e));
+    } finally {
+      setBusy(null);
+    }
   };
   const sync = async () => {
     if (!canEdit) return router.push("/premium");
@@ -90,7 +69,7 @@ export default function GmailScreen() {
     await disableDailySync();
     await commit((s) => {
       const base = removeRecords ? removeGmailRecords(s) : { ...s, suggestions: [] };
-      return { ...base, gmail: { ...base.gmail, connected: false, email: null, lastSyncStatus: "idle", lastError: null, processedIds: [], initialScanDone: false } };
+      return { ...base, dismissedRefs: [], gmail: { ...base.gmail, connected: false, email: null, lastSyncStatus: "idle", lastError: null, processedIds: [], initialScanDone: false } };
     });
     setBusy(null);
     setDiscOpen(false);
@@ -109,7 +88,7 @@ export default function GmailScreen() {
               <Ionicons name={g.connected ? "mail-open-outline" : "mail-outline"} size={22} color={g.connected ? colors.onBrandTertiary : colors.muted} />
             </View>
             <View style={{ flex: 1 }}>
-              <T v="h3" testID="gmail-status-text">{g.connected ? "Conectado" : !avail.ok && avail.reason === "pending_config" ? "Configuración pendiente" : "No conectado"}</T>
+              <T v="h3" testID="gmail-status-text">{g.connected ? "Conectado" : !avail.ok && avail.reason === "native_missing" ? "Requiere compilación Android" : "No conectado"}</T>
               <T v="caption">{g.connected ? g.email ?? "Cuenta de Google autorizada" : "Subly funciona igual de forma manual"}</T>
             </View>
           </View>
@@ -123,7 +102,7 @@ export default function GmailScreen() {
           ) : null}
         </Card>
 
-        {!avail.ok ? <Notice testID="gmail-unavailable" tone={avail.reason === "pending_config" ? "warning" : "info"} icon={avail.reason === "pending_config" ? "construct-outline" : "phone-portrait-outline"} title={avail.reason === "pending_config" ? "Integración no configurada" : "Disponible en Android"} body={avail.message} /> : null}
+        {!avail.ok ? <Notice testID="gmail-unavailable" tone={avail.reason === "native_missing" ? "warning" : "info"} icon={avail.reason === "native_missing" ? "construct-outline" : "phone-portrait-outline"} title={avail.reason === "native_missing" ? "Disponible en la app instalada" : "Disponible en Android"} body={avail.message} /> : null}
         {oauthError ? <Notice testID="gmail-oauth-error" tone="error" icon="alert-circle-outline" title="Autorización no completada" body={oauthError} /> : null}
 
         {!g.connected ? (
@@ -143,11 +122,11 @@ export default function GmailScreen() {
                 </View>
               ))}
             </View>
-            <Button testID="gmail-connect-button" title="Conectar con Google" icon="logo-google" style={{ marginTop: spacing.lg }} disabled={!avail.ok || !request} loading={busy === "connect"} onPress={connect} />
+            <Button testID="gmail-connect-button" title="Conectar con Google" icon="logo-google" style={{ marginTop: spacing.lg }} disabled={!avail.ok} loading={busy === "connect"} onPress={connect} />
           </Card>
         ) : (
           <View style={{ gap: spacing.sm }}>
-            {g.lastSyncStatus === "reauth" ? <Button testID="gmail-reauth-button" title="Volver a autorizar" icon="key-outline" disabled={!avail.ok || !request} onPress={connect} /> : null}
+            {g.lastSyncStatus === "reauth" ? <Button testID="gmail-reauth-button" title="Volver a autorizar" icon="key-outline" disabled={!avail.ok} onPress={connect} /> : null}
             <Button testID="gmail-sync-button" title="Sincronizar ahora" icon="sync-outline" loading={busy === "sync"} onPress={sync} />
             <Button testID="gmail-disconnect-button" kind="secondary" title="Desconectar Gmail" icon="log-out-outline" onPress={() => setDiscOpen(true)} />
           </View>
@@ -181,7 +160,7 @@ export default function GmailScreen() {
       </ScrollView>
 
       <Sheet visible={discOpen} onClose={() => setDiscOpen(false)} title="Desconectar Gmail" testID="gmail-disconnect-sheet">
-        <T v="body" color="muted">Revocaremos la autorización y borraremos las credenciales de este dispositivo. Los registros creados manualmente no se modifican.</T>
+        <T v="body" color="muted">Revocaremos la autorización en Google y borraremos de este dispositivo las credenciales, la cuenta conectada, los identificadores de mensajes analizados y las detecciones pendientes. Los registros creados manualmente no se modifican.</T>
         <Button testID="gmail-disconnect-keep" title={`Desconectar y conservar ${gmailCount} registro(s) detectados`} loading={busy === "disconnect"} onPress={() => disconnect(false)} />
         <Button testID="gmail-disconnect-remove" kind="danger" title="Desconectar y eliminar registros de Gmail" onPress={() => disconnect(true)} />
       </Sheet>

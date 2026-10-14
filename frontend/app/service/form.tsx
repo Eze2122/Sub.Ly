@@ -12,7 +12,7 @@ import { useAppState } from "@/src/data/store.ts";
 import { firstDueOnOrAfter, parseISO, todayISO } from "@/src/domain/dates.ts";
 import { formatAmountInput, parseAmount } from "@/src/domain/money.ts";
 import { createService, findDuplicate, updateService, validateServiceInput, type FieldErrors, type ServiceInput } from "@/src/domain/operations.ts";
-import { CATEGORIES, FREQUENCIES, type CategoryId, type Frequency, type IntervalUnit } from "@/src/domain/types.ts";
+import { CATEGORIES, FREQUENCIES, type CategoryId, type Frequency, type IntervalUnit, type Usage } from "@/src/domain/types.ts";
 import { spacing, useTheme } from "@/src/theme";
 
 const UNITS: { id: IntervalUnit; label: string }[] = [
@@ -49,6 +49,7 @@ export default function ServiceForm() {
   const [trialEnd, setTrialEnd] = useState<string | null>(init?.trialEnd ?? sug?.trialEnd ?? null);
   const [reminders, setReminders] = useState(init?.reminders ?? true);
   const [notes, setNotes] = useState(init?.notes ?? "");
+  const [usage, setUsageSel] = useState<Usage | "none">(init?.usage ?? "none");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
   const [showTrial, setShowTrial] = useState(!!(init?.trialEnd || sug?.trialEnd));
@@ -58,10 +59,11 @@ export default function ServiceForm() {
       name, description, category, amountMinor: amount.trim() ? parseAmount(amount) : trialEnd ? 0 : null, currency, frequency,
       customInterval: frequency === "custom" ? { count: Number(customCount), unit: customUnit } : undefined,
       nextDue, lastPaid, startDate, endDate, trialStart, trialEnd, reminders, notes,
+      usage: usage === "none" ? null : usage,
       source: existing?.source ?? (sug ? "gmail" : "manual"),
       sourceRef: existing?.sourceRef ?? sug?.sourceRef ?? null,
     }),
-    [name, description, category, amount, currency, frequency, customCount, customUnit, nextDue, lastPaid, startDate, endDate, trialStart, trialEnd, reminders, notes, existing, sug],
+    [name, description, category, amount, currency, frequency, customCount, customUnit, nextDue, lastPaid, startDate, endDate, trialStart, trialEnd, reminders, notes, usage, existing, sug],
   );
 
   const dup = !existing && name.trim().length > 2 ? findDuplicate(st, name, null) : null;
@@ -179,6 +181,10 @@ export default function ServiceForm() {
           </View>
           <Switch testID="service-form-reminders" value={reminders} onValueChange={setReminders} trackColor={{ true: colors.brandPrimary, false: colors.borderStrong }} thumbColor={colors.surfaceSecondary} />
         </View>
+
+        <FieldLabel label="¿Cuánto lo usás? (opcional)" hint="Se usa solo para la alerta de ahorro en Reportes.">
+          <Segmented testID="service-form-usage" options={[{ id: "none", label: "Sin indicar" }, { id: "high", label: "Mucho" }, { id: "medium", label: "A veces" }, { id: "low", label: "Poco" }]} value={usage} onChange={setUsageSel} />
+        </FieldLabel>
 
         <FieldLabel label="Descripción (opcional)">
           <Input testID="service-form-description" value={description} onChangeText={setDescription} placeholder="Ej.: Plan familiar" maxLength={120} />

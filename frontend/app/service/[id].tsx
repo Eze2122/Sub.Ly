@@ -12,7 +12,7 @@ import { useAppState } from "@/src/data/store.ts";
 import { computeStatus, formatDate, relativeDue, todayISO } from "@/src/domain/dates.ts";
 import { convertTotals, formatAmountInput, formatMoney, monthlyEquivalent, parseAmount } from "@/src/domain/money.ts";
 import { cancelService, confirmPayment, deletePayment, deleteService, reactivateService } from "@/src/domain/operations.ts";
-import { categoryOf, frequencyLabel } from "@/src/domain/types.ts";
+import { categoryOf, frequencyLabel, USAGE_LABEL } from "@/src/domain/types.ts";
 import { spacing, useTheme } from "@/src/theme";
 
 export default function ServiceDetail() {
@@ -94,6 +94,7 @@ export default function ServiceDetail() {
             <Info label="Inicio" value={formatDate(s.startDate)} />
             <Info label="Finalización" value={formatDate(s.endDate)} />
             {s.trialEnd ? <Info label="Prueba gratuita" value={`${formatDate(s.trialStart)} → ${formatDate(s.trialEnd)}`} /> : null}
+            <Info label="Uso declarado" value={s.usage ? USAGE_LABEL[s.usage] : "Sin indicar"} />
             <Info label="Recordatorios" value={s.reminders && !s.cancelled ? "Activados" : "Desactivados"} />
             <Info label="Origen" value={s.source === "gmail" ? "Gmail" : "Manual"} />
             {s.description ? <Info label="Descripción" value={s.description} /> : null}

@@ -12,7 +12,8 @@ frontend/                      Expo SDK 57 (React Native 0.86, expo-router)
     operations (CRUD, pagos, restauración, migraciones), stats, reminders,
     gmailParser (heurísticas), backup (CSV + cifrado)
   src/data/                    Persistencia local (store.ts) + acciones con control premium
-  src/gmail/                   OAuth PKCE, cliente Gmail API + sincronización, tarea diaria
+  src/gmail/                   Autorización (usa modules/subly-google-auth), Gmail API + sincronización, tarea diaria
+modules/subly-google-auth/     Módulo nativo Android local (AuthorizationClient, gmail.readonly)
   src/billing/                 expo-iap (Play Billing) + entitlement verificado por backend
   src/services/                Notificaciones locales, archivos (compartir/elegir)
   src/components/              Sistema de diseño (ui, Sheet, Toast, charts, calendario)
@@ -24,7 +25,7 @@ docs/                          Configuración, estado, privacidad
 
 ## Decisiones técnicas
 - **Persistencia**: documento JSON versionado (`schemaVersion`) guardado de forma atómica mediante el almacenamiento local del dispositivo (AsyncStorage en Android, SQLite nativo). Escrituras serializadas en cola; si una escritura falla se revierte el estado en memoria. Migraciones en `operations.migrate`. Funciona sin internet. Importes en centavos enteros; fechas como fechas de calendario `YYYY-MM-DD`.
-- **Datos sensibles**: tokens OAuth y estado de suscripción en `expo-secure-store` (Android Keystore). `android.allowBackup=false` evita que el backup automático de Android copie la base local sin cifrar.
+- **Datos sensibles**: los permisos de Gmail los administran los servicios de Google Play (AuthorizationClient); Subly no guarda tokens de Google de forma permanente ni usa refresh tokens. El estado verificado de la suscripción y el token de compra de Play se guardan en `expo-secure-store` (Android Keystore). `android.allowBackup=false` evita que el backup automático de Android copie la base local sin cifrar.
 - **Copias**: PBKDF2-SHA256 (60.000 iteraciones, sal aleatoria de 16 bytes) → claves AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC), IV aleatorio, versión de formato, verificación de integridad antes de descifrar. La contraseña no se guarda. Si se pierde, no hay recuperación.
 - **Gmail**: búsqueda por palabras clave, 12 meses (máx. 400 mensajes) la primera vez; luego incremental con `after:` + IDs procesados. Cuerpos procesados en memoria y descartados. Alta confianza (≥0,8, recurrencia + importe + fecha) → registro automático; resto → sugerencia para confirmar/corregir/descartar. Dedupe por `sourceRef` (remitente), nombre normalizado e IDs de mensaje.
 - **Premium**: concedido solo con verificación del backend contra Google Play; el dispositivo guarda el último resultado verificado y lo respeta hasta su `expiryTime` (sin conexión no se borra nada ni se bloquea la exportación).
@@ -53,8 +54,7 @@ Gmail OAuth, Billing, tareas en segundo plano y notificaciones requieren una **c
 - La detección de Gmail es heurística: formatos inusuales pueden no detectarse o requerir corrección.
 - Android puede postergar la sincronización diaria y los recordatorios (Doze/ahorro de batería).
 - Los tipos de cambio son manuales.
-- El esquema de URI personalizado para OAuth debe habilitarse en el cliente Android de Google.
-- Las apps OAuth en modo *Prueba* reciben refresh tokens que caducan a los 7 días.
+- Con la pantalla de consentimiento en modo *Prueba*, la autorización de Google puede caducar a los 7 días; la app pide volver a autorizar ("reauth").
 - La vista web es solo para previsualizar la interfaz: sin Gmail, Billing ni notificaciones.
 
 ## Tareas externas pendientes

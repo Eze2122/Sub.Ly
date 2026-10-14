@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.sublygoogleauth'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.sublygoogleauth"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // Google Identity Services AuthorizationClient (official Android authorization API).
+  implementation "com.google.android.gms:play-services-auth:21.4.0"
+}

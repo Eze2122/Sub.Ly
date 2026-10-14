@@ -7,7 +7,7 @@ import { addMonths, computeStatus, firstDueOnOrAfter, nextDueAfter } from "../do
 import { detect, extractAmount, groupDetections, inferFrequency } from "../domain/gmailParser.ts";
 import { convertTotals, parseAmount } from "../domain/money.ts";
 import { confirmPayment, createService, deleteService, emptyState, migrate, restoreInto, updateService, validateServiceInput, type ServiceInput } from "../domain/operations.ts";
-import { summarize } from "../domain/stats.ts";
+import { savingsSummary, summarize } from "../domain/stats.ts";
 import { planNotifications as planNotificationsPure } from "../domain/reminders.ts";
 import { randomBytes } from "node:crypto";
 
@@ -161,4 +161,18 @@ test("notifications plan: deterministic ids, no duplicates, cancelled excluded",
   assert.equal(plan.length, 4);
   const again = planNotificationsPure(state, new Date(2026, 5, 10, 8));
   assert.deepEqual(again.map((p) => p.id), ids);
+});
+
+test("savings alert uses only declared usage, annual per currency", () => {
+  let s = createService(emptyState(), base({ name: "Streaming", amountMinor: 1000, currency: "USD", usage: "low" }), NOW, TODAY).state;
+  s = createService(s, base({ name: "Gym", amountMinor: 3000000, currency: "ARS", frequency: "quarterly", usage: "low" }), NOW, TODAY).state;
+  s = createService(s, base({ name: "Nube", amountMinor: 500, currency: "USD", frequency: "annual", usage: "high" }), NOW, TODAY).state;
+  s = createService(s, base({ name: "Diario", amountMinor: 200, currency: "USD" }), NOW, TODAY).state;
+  const r = savingsSummary(s.services, TODAY);
+  assert.equal(r.low.length, 2);
+  assert.equal(r.annualLow.USD, 12000);
+  assert.equal(r.annualLow.ARS, 12000000);
+  assert.equal(r.unrated.length, 1);
+  const cancelled = { ...s, services: s.services.map((x) => (x.name === "Streaming" ? { ...x, cancelled: true } : x)) };
+  assert.equal(savingsSummary(cancelled.services, TODAY).annualLow.USD, undefined);
 });

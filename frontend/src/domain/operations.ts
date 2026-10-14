@@ -1,6 +1,6 @@
 // Pure state transitions (CRUD, payments, suggestions, restore). No I/O here.
 import { addDays, computeStatus, firstDueOnOrAfter, isValidISO, nextDueAfter, parseISO } from "./dates.ts";
-import type { AppState, CategoryId, CustomInterval, Frequency, Payment, Service, Suggestion } from "./types.ts";
+import type { AppState, CategoryId, CustomInterval, Frequency, Payment, Service, Suggestion, Usage } from "./types.ts";
 
 export const SCHEMA_VERSION = 2;
 
@@ -72,6 +72,7 @@ export type ServiceInput = {
   trialEnd?: string | null;
   reminders: boolean;
   notes?: string;
+  usage?: Usage | null;
   source?: "manual" | "gmail";
   sourceRef?: string | null;
 };
@@ -119,6 +120,7 @@ function normalize(i: ServiceInput, today: string) {
     trialEnd: i.trialEnd || null,
     reminders: i.reminders,
     notes: i.notes?.trim() || undefined,
+    usage: i.usage ?? null,
   };
 }
 
@@ -197,6 +199,10 @@ export function confirmPayment(
     payments: [...state.payments, payment],
     services: state.services.map((s) => (s.id === id ? { ...s, lastPaid: paidDate, nextDue: svc.frequency === "once" ? null : nextDue, updatedAt: nowIso } : s)),
   };
+}
+
+export function setUsage(state: AppState, id: string, usage: Usage | null, nowIso: string): AppState {
+  return { ...state, services: state.services.map((s) => (s.id === id ? { ...s, usage, updatedAt: nowIso } : s)) };
 }
 
 export function deletePayment(state: AppState, paymentId: string): AppState {

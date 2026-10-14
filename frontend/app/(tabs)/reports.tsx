@@ -4,6 +4,7 @@ import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Bars, Donut } from "@/src/components/charts";
+import { SavingsCard } from "@/src/components/SavingsCard";
 import { Card, Chip, EmptyState, Notice, SectionHeader, T } from "@/src/components/ui";
 import { useAppState } from "@/src/data/store.ts";
 import { formatDate, MONTHS_LONG, todayISO } from "@/src/domain/dates.ts";
@@ -133,6 +134,8 @@ export default function Reports() {
                 </>
               )}
             </Card>
+
+            <SavingsCard st={st} today={today} />
 
             <Card testID="reports-upcoming">
               <SectionHeader title="Próximos vencimientos (30 días)" />

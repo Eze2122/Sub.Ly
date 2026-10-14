@@ -1,97 +1,53 @@
-# Configuración de Google para Subly (OAuth, Gmail API, Play Billing)
+# Configuración de Google para Sub.Ly (Gmail OAuth nativo y Play Billing)
 
-> Ningún valor de este documento es una credencial real. Donde aparece `<...>` debés reemplazarlo por el valor de **tu** proyecto.
+> Ningún valor de este documento es una credencial real. Gmail OAuth **no fue probado todavía en un dispositivo real**.
 
-## Arquitectura real (determina qué credenciales se necesitan)
-
-| Pieza | Tecnología | Credencial necesaria |
+## Arquitectura de autorización (Android)
+| Pieza | Implementación | Credencial |
 |---|---|---|
-| App Android | Expo SDK 57 / React Native, `expo-auth-session` (OAuth 2.0 Authorization Code + **PKCE**) | **Client ID OAuth de tipo Android** (público). **No** usa client secret. |
-| Lectura de Gmail | Llamadas directas del dispositivo a `gmail.googleapis.com` con el access token | Gmail API habilitada en el proyecto de Google Cloud |
-| Validación de compras | Backend FastAPI → Google Play Developer API `purchases.subscriptionsv2.get` | **Cuenta de servicio** (secreta, solo backend) vinculada a Play Console |
-| Notificaciones de suscripción (opcional) | Pub/Sub push autenticado → `POST /api/billing/rtdn` | Tema Pub/Sub + cuenta de servicio de push |
+| Autorización Gmail | Módulo local `frontend/modules/subly-google-auth` (Kotlin) con **Google Identity Services `AuthorizationClient`** (`play-services-auth` 21.4.0), el método recomendado por Google para Android | **Cliente OAuth tipo Android** en Google Cloud (paquete + SHA-1). **No** hay Client ID, secreto ni URI de redirección en la app |
+| Lectura de Gmail | El teléfono llama a `gmail.googleapis.com` con un access token de corta duración (solo en memoria) | Gmail API habilitada |
+| Renovación | `authorize()` silencioso vía Google Play services; ante 401 se limpia el token en caché (`GoogleAuthUtil.clearToken`) y se reintenta una vez | — |
+| Revocación | `POST https://oauth2.googleapis.com/revoke` + limpieza de caché local | — |
 
-**No se necesita un cliente OAuth "Web"**: la versión web de la vista previa no conecta Gmail (Google exige client secret para clientes web, y no debe incluirse en una app). Por lo tanto **no hay orígenes JavaScript autorizados que registrar**.
+Permiso único solicitado: `https://www.googleapis.com/auth/gmail.readonly`. El correo de la cuenta se obtiene con `users.getProfile` de Gmail (cubierto por ese permiso); ya **no** se solicita `email`. No se necesita cliente Web, orígenes JavaScript ni esquema de URI personalizado (el flujo anterior por navegador fue eliminado).
 
-## 1. APIs a habilitar en Google Cloud
-En [console.cloud.google.com](https://console.cloud.google.com) → *APIs y servicios → Biblioteca*:
-1. **Gmail API** (para la lectura de correos).
-2. **Google Play Android Developer API** (para validar suscripciones desde el backend).
-3. **Cloud Pub/Sub API** (solo si usás RTDN).
+## Pasos en Google Cloud (se pueden hacer desde el navegador del teléfono)
+1. Crear/seleccionar proyecto → *APIs y servicios → Biblioteca* → habilitar **Gmail API** (y *Google Play Android Developer API* para Billing).
+2. *Google Auth Platform → Branding*: nombre **Sub.Ly** (mismo nombre que en la política), correo de soporte, página de inicio `https://eze2122.github.io/-subly-privacy/index.html`, política `https://eze2122.github.io/-subly-privacy/privacy.html`, dominio autorizado `eze2122.github.io` (verificalo en Google Search Console).
+3. *Audience*: Externo, estado **Testing**, agregá tu cuenta en **Usuarios de prueba**.
+4. *Data Access*: agregá solo `.../auth/gmail.readonly` (alcance restringido).
+5. *Clients → Crear cliente → Android*: paquete `com.eze2122.subly` + **SHA-1** real de la firma del APK que vas a instalar. Creá un cliente por cada firma (compilación de prueba de Emergent y, más adelante, la clave de firma de Google Play). No hace falta copiar el Client ID a la app.
 
-## 2. Pantalla de consentimiento OAuth
-*APIs y servicios → Pantalla de consentimiento de OAuth* (Google Auth Platform):
-1. Tipo de usuario **Externo**.
-2. Nombre de la app: **Subly**; correo de soporte; logotipo de Subly (opcional, requiere verificación de marca).
-3. Dominio de la página de inicio y **URL de la política de privacidad** (obligatoria para alcances restringidos). Usá la política de `docs/POLITICA_PRIVACIDAD.md` publicada en un dominio **que controles** (no registres dominios que todavía no existen).
-4. Alcances: agregá **solo** `https://www.googleapis.com/auth/gmail.readonly` y `email` (para mostrar la cuenta conectada).
-5. Mientras la app esté en *Prueba*, agregá las cuentas de Gmail de prueba en **Usuarios de prueba** (máx. 100).
+## Obtener la SHA-1 (requiere la compilación final autorizada)
+- `apksigner verify --print-certs subly.apk` (línea `SHA-1 digest`) o `keytool -printcert -jarfile subly.apk`.
+- O pedir el certificado de firma de la compilación a support@emergent.sh.
+- App publicada en Play: Play Console → Integridad de la app → certificado de la clave de firma.
 
-## 3. Nombre de paquete Android definitivo
-- Identificador definitivo: **`com.eze2122.subly`**, en `frontend/app.json` → `expo.android.package`. El segundo valor de `expo.scheme` es el mismo identificador (se usa como esquema de redirección OAuth).
-- Usalo exactamente igual al crear la app en Play Console y el cliente OAuth Android. Después de publicar en Google Play **no puede modificarse**.
-- `ios.bundleIdentifier` también es `com.eze2122.subly` por coherencia (Subly se publica primero en Android).
-
-## 4. Huellas SHA-1 y SHA-256
-Se necesitan para el cliente OAuth Android (SHA-1) y es recomendable registrar ambas.
-- **Compilaciones generadas con Publish (Emergent/EAS):** la firma la gestiona la plataforma. Después de generar la compilación Android, pedí las credenciales de firma (keystore) desde el panel de compilación o a support@emergent.sh, y obtené la huella con `keytool -list -v -keystore <archivo.jks> -alias <alias>` (líneas `SHA1:` y `SHA256:`).
-- **Desde el APK instalable de prueba** (sin acceso al keystore): `apksigner verify --print-certs subly.apk` (Android SDK build-tools) o `keytool -printcert -jarfile subly.apk`. Esta es la huella del APK que vas a instalar para probar Gmail OAuth.
-- **App publicada en Google Play:** Play Console → *Prueba y lanzamiento → Configuración → Integridad de la app → Certificado de la clave de firma de apps*. Esa es la huella que ve el usuario final; registrala también.
-- Si usás compilaciones locales: `cd android && ./gradlew signingReport`.
-Creá **un cliente Android por cada huella** (debug/upload/app-signing) que vayas a usar.
-
-## 5. Cliente OAuth para Android
-*APIs y servicios → Credenciales → Crear credenciales → ID de cliente de OAuth → Android*:
-1. Nombre del paquete: el de `app.json`.
-2. Huella SHA-1 del certificado correspondiente.
-3. En **Configuración avanzada**, activá **"Habilitar esquema de URI personalizado"** (Google lo deshabilita por defecto en clientes nuevos; Subly usa el esquema `<paquete>:/oauth2redirect`).
-4. Copiá el *Client ID* (formato `NUMERO-xxxx.apps.googleusercontent.com`).
-
-## 6. ¿Cliente OAuth web?
-No es necesario para esta arquitectura (ver tabla inicial). No crearlo evita exponer un client secret.
-
-## 7. URI de redirección
-- Valor real: **`<android.package>:/oauth2redirect`** → hoy: `com.eze2122.subly:/oauth2redirect`.
-- Los clientes Android no tienen campo de "URI autorizados": Google valida paquete + firma + esquema personalizado. No hay orígenes JavaScript.
-
-## 8. Permisos de Gmail y justificación
-| Alcance | Motivo |
+## Dónde se configura cada dato
+| Dato | Lugar |
 |---|---|
-| `gmail.readonly` | Buscar y leer facturas, recibos, renovaciones y pruebas gratuitas para crear registros. Subly **no** envía, borra ni modifica correos. `gmail.metadata` no alcanza porque los importes y fechas están en el cuerpo del mensaje. |
-| `email` | Mostrar qué cuenta está conectada. |
+| Paquete | `frontend/app.json` → `android.package` = `com.eze2122.subly` |
+| Permiso Gmail | `frontend/modules/subly-google-auth/android/.../SublyGoogleAuthModule.kt` y `frontend/src/gmail/oauth.ts` |
+| SHA-1 / cliente Android | Solo en Google Cloud |
+| Producto de suscripción y validación | Backend: `PLAY_SUBSCRIPTION_ID`, `PLAY_PACKAGE_NAME`, `PLAY_SERVICE_ACCOUNT_FILE` |
 
-## 9. Verificación y revisiones de Google
-- `gmail.readonly` es un **alcance restringido**. Para publicar a más de 100 usuarios: verificación de la app OAuth (dominio, política de privacidad, video demostrativo del uso del permiso) y, como los datos se procesan en el dispositivo y no se almacenan en servidores, normalmente aplica la evaluación de "Limited Use"; Google puede exigir una **evaluación de seguridad (CASA)** si los datos restringidos llegaran a un servidor. Los plazos los define Google (semanas).
-- Play Console: completar *Seguridad de los datos* declarando datos financieros y correos procesados en el dispositivo.
+## Prueba real (en el teléfono, con la compilación instalada)
+1. Ajustes → Conexión con Gmail → **Conectar con Google** → elegir la cuenta de prueba → aceptar lectura de Gmail.
+2. Verificar estado "Conectado" con tu correo, fecha de última sincronización y registros/sugerencias reales.
+3. *Sincronizar ahora*; luego *Desconectar* (conservar y eliminar) y comprobar en myaccount.google.com/connections que el acceso desaparece.
 
-## 10. Dónde se configura cada identificador
-| Dato | Archivo / lugar |
+## Diagnóstico
+| Mensaje en la app / código | Causa |
 |---|---|
-| Client ID Android | `frontend/.env` → `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` (o secreto de despliegue con el mismo nombre). Leído en `frontend/src/gmail/oauth.ts`. |
-| Paquete Android / esquema | `frontend/app.json` → `android.package` y `scheme` |
-| ID de producto de suscripción | Backend: `PLAY_SUBSCRIPTION_ID` (`backend/.env` o secretos). La app lo obtiene de `GET /api/billing/config`. |
-| Paquete para validación | Backend: `PLAY_PACKAGE_NAME` |
-| Cuenta de servicio Play | Backend: `PLAY_SERVICE_ACCOUNT_FILE` (ruta a JSON fuera del repo) |
-| RTDN | Backend: `PUBSUB_AUDIENCE`, `PUBSUB_PUSH_SERVICE_ACCOUNT` |
+| "Configuración pendiente en Google Cloud" (`DEVELOPER_ERROR`) | Falta el cliente Android, la SHA-1 no coincide con el APK instalado, Gmail API deshabilitada o la cuenta no es usuario de prueba |
+| "Cancelaste la autorización" (`CANCELED`) | El usuario cerró la pantalla de Google |
+| "No otorgaste el permiso de lectura" (`SCOPE_DENIED`) | Se rechazó el permiso de Gmail |
+| "Necesitás volver a autorizar" (`INTERACTION_REQUIRED`, 401/403) | Acceso revocado o caducado; en modo Testing Google puede exigir reautorizar a los 7 días |
+| "Requiere compilación Android" | Expo Go / web: el módulo nativo no existe ahí |
 
-## 11. Prueba real de conexión y lectura
-1. Configurá el Client ID y generá una **compilación Android** (Publish → build). Expo Go **no** sirve para OAuth con esquema propio ni para Billing.
-2. Instalá el APK con una cuenta listada como *usuario de prueba*.
-3. Ajustes → Conexión con Gmail → *Conectar con Google* → elegir cuenta → aceptar permiso de lectura.
-4. Verificá: estado "Conectado" con el email, "Última sincronización" con fecha, y registros/sugerencias creados a partir de correos reales (por ejemplo, un recibo de una suscripción conocida).
-5. Probá *Sincronizar ahora*, *Desconectar* (conservar y eliminar) y que el acceso desaparezca en `myaccount.google.com/connections`.
-
-## 12. Diagnóstico de errores
-| Error | Causa probable |
-|---|---|
-| `redirect_uri_mismatch` / `invalid_request` "Custom URI scheme is not enabled" | Esquema personalizado deshabilitado en el cliente Android, o `scheme` de `app.json` ≠ paquete. |
-| `unauthorized_client` / `invalid_client` | Client ID de otro tipo (web/iOS) o SHA-1 que no coincide con la firma del APK instalado. |
-| `access_denied` | El usuario rechazó, o la cuenta no está en *Usuarios de prueba*. |
-| `403 insufficientPermissions` en Gmail | Gmail API no habilitada o alcance no concedido. Subly muestra "Necesitás volver a autorizar". |
-| `invalid_grant` al refrescar | Token revocado o caducado (apps en modo *Prueba* caducan refresh tokens a los 7 días). La app pide reautorizar. |
-| `429` | Cuota de Gmail API; reintentar luego. |
-
----
+## Verificación para producción
+`gmail.readonly` es restringido: para más de 100 usuarios, Google exige verificación OAuth (política pública con la declaración de *Limited Use*, dominio verificado, video de demostración) y puede pedir una evaluación de seguridad. La decisión es de Google.
 
 # Google Play Billing
 

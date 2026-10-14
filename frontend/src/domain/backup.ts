@@ -4,7 +4,7 @@ import CryptoJS from "crypto-js";
 
 import { computeStatus } from "./dates.ts";
 import { migrate } from "./operations.ts";
-import { categoryOf, frequencyLabel, STATUS_LABEL, type AppState } from "./types.ts";
+import { categoryOf, frequencyLabel, STATUS_LABEL, USAGE_LABEL, type AppState } from "./types.ts";
 
 function cell(v: unknown) {
   const s = v === null || v === undefined ? "" : String(v);
@@ -17,12 +17,12 @@ function amount(minor: number) {
 export function servicesCsv(state: AppState, today: string) {
   const head = [
     "Nombre", "Descripción", "Categoría", "Importe", "Moneda", "Frecuencia", "Próximo vencimiento", "Último pago",
-    "Estado", "Inicio", "Finalización", "Inicio prueba", "Fin prueba", "Recordatorios", "Origen", "Notas", "Creado", "Modificado",
+    "Estado", "Inicio", "Finalización", "Inicio prueba", "Fin prueba", "Recordatorios", "Uso declarado", "Origen", "Notas", "Creado", "Modificado",
   ];
   const rows = state.services.map((s) => [
     s.name, s.description ?? "", categoryOf(s.category).label, amount(s.amountMinor), s.currency, frequencyLabel(s),
     s.nextDue ?? "", s.lastPaid ?? "", STATUS_LABEL[computeStatus(s, today)], s.startDate ?? "", s.endDate ?? "",
-    s.trialStart ?? "", s.trialEnd ?? "", s.reminders ? "Sí" : "No", s.source === "gmail" ? "Gmail" : "Manual",
+    s.trialStart ?? "", s.trialEnd ?? "", s.reminders ? "Sí" : "No", s.usage ? USAGE_LABEL[s.usage] : "Sin indicar", s.source === "gmail" ? "Gmail" : "Manual",
     s.notes ?? "", s.createdAt, s.updatedAt,
   ]);
   const pays = state.payments.map((p) => [p.serviceName, categoryOf(p.category).label, p.dueDate ?? "", p.paidDate, amount(p.amountMinor), p.currency, p.evidence === "manual" ? "Confirmado por el usuario" : "Comprobante Gmail confirmado"]);

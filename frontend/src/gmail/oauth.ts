@@ -1,80 +1,24 @@
-// Google OAuth 2.0 (Authorization Code + PKCE) for Gmail read-only access.
-// Public Android client ID only (no client secret in the app). Tokens live in
-// secure storage (Android Keystore-backed EncryptedSharedPreferences).
-import Constants from "expo-constants";
-import { exchangeCodeAsync, makeRedirectUri, refreshAsync, revokeAsync, useAuthRequest, ResponseType } from "expo-auth-session";
-import * as WebBrowser from "expo-web-browser";
+// Gmail read-only authorization on Android via Google Identity Services
+// AuthorizationClient (local module `modules/subly-google-auth`).
+// Only scope: gmail.readonly. No client ID or secret in the app: Google matches the
+// Android OAuth client by package (com.eze2122.subly) + signing SHA-1.
+// Access tokens are short-lived and kept only in memory; Google Play services
+// renews them silently. Nothing is persisted except removal of legacy tokens.
 import { Platform } from "react-native";
 
+import { SublyGoogleAuth } from "@/modules/subly-google-auth";
 import { storage } from "@/src/utils/storage";
 
-WebBrowser.maybeCompleteAuthSession();
-
 export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
-const ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || "";
-const TOKEN_KEY = "subly.gmail.tokens";
+const LEGACY_TOKEN_KEY = "subly.gmail.tokens";
+const TOKEN_TTL_MS = 45 * 60 * 1000;
 
-export const discovery = {
-  authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
-  tokenEndpoint: "https://oauth2.googleapis.com/token",
-  revocationEndpoint: "https://oauth2.googleapis.com/revoke",
-};
-
-export type OAuthAvailability =
-  | { ok: true }
-  | { ok: false; reason: "pending_config" | "platform" ; message: string };
+export type OAuthAvailability = { ok: true } | { ok: false; reason: "platform" | "native_missing"; message: string };
 
 export function oauthAvailability(): OAuthAvailability {
   if (Platform.OS !== "android") return { ok: false, reason: "platform", message: "La conexión con Gmail está disponible en la app de Android." };
-  if (!ANDROID_CLIENT_ID) return { ok: false, reason: "pending_config", message: "Configuración pendiente: falta el Client ID de Android de Google OAuth (EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID)." };
+  if (!SublyGoogleAuth) return { ok: false, reason: "native_missing", message: "Requiere la app instalada desde una compilación Android de Sub.Ly (no disponible en Expo Go)." };
   return { ok: true };
-}
-
-/** Redirect for Google "Android" OAuth clients: <applicationId>:/oauth2redirect */
-export function redirectUri() {
-  const pkg = Constants.expoConfig?.android?.package ?? "";
-  return makeRedirectUri({ native: `${pkg}:/oauth2redirect` });
-}
-
-type Tokens = { accessToken: string; refreshToken: string | null; expiresAt: number };
-
-export function useGmailAuthRequest() {
-  return useAuthRequest(
-    {
-      clientId: ANDROID_CLIENT_ID || "unconfigured",
-      responseType: ResponseType.Code,
-      redirectUri: redirectUri(),
-      scopes: [GMAIL_SCOPE, "email"],
-      usePKCE: true,
-      extraParams: { access_type: "offline", prompt: "consent" },
-    },
-    discovery,
-  );
-}
-
-export async function exchangeCode(code: string, codeVerifier: string) {
-  const res = await exchangeCodeAsync(
-    { clientId: ANDROID_CLIENT_ID, code, redirectUri: redirectUri(), extraParams: { code_verifier: codeVerifier } },
-    discovery,
-  );
-  const old = await loadTokens();
-  const t: Tokens = {
-    accessToken: res.accessToken,
-    refreshToken: res.refreshToken ?? old?.refreshToken ?? null,
-    expiresAt: Date.now() + (res.expiresIn ?? 3600) * 1000,
-  };
-  await storage.secureSet(TOKEN_KEY, JSON.stringify(t));
-  return t;
-}
-
-export async function loadTokens(): Promise<Tokens | null> {
-  const raw = await storage.secureGet(TOKEN_KEY, null as string | null);
-  if (!raw) return null;
-  try {
-    return JSON.parse(String(raw));
-  } catch {
-    return null;
-  }
 }
 
 export class ReauthRequired extends Error {
@@ -82,28 +26,84 @@ export class ReauthRequired extends Error {
     super("REAUTH_REQUIRED");
   }
 }
-
-export async function getAccessToken(force = false): Promise<string> {
-  const t = await loadTokens();
-  if (!t) throw new ReauthRequired();
-  if (!force && t.expiresAt > Date.now() + 60000) return t.accessToken;
-  if (!t.refreshToken) throw new ReauthRequired();
-  try {
-    const r = await refreshAsync({ clientId: ANDROID_CLIENT_ID, refreshToken: t.refreshToken }, discovery);
-    const next: Tokens = { accessToken: r.accessToken, refreshToken: r.refreshToken ?? t.refreshToken, expiresAt: Date.now() + (r.expiresIn ?? 3600) * 1000 };
-    await storage.secureSet(TOKEN_KEY, JSON.stringify(next));
-    return next.accessToken;
-  } catch {
-    throw new ReauthRequired();
+export class OAuthError extends Error {
+  code: string;
+  constructor(code: string) {
+    super(code);
+    this.code = code;
   }
 }
 
-/** Revokes the grant at Google (best effort) and always deletes local tokens. */
-export async function revokeAndClear() {
-  const t = await loadTokens();
+export function oauthErrorMessage(e: unknown) {
+  const code = e instanceof OAuthError ? e.code : "AUTH_FAILED";
+  switch (code) {
+    case "CANCELED":
+      return "Cancelaste la autorización. Podés seguir usando Sub.Ly manualmente.";
+    case "SCOPE_DENIED":
+      return "No otorgaste el permiso de lectura de Gmail. Sub.Ly sigue funcionando en modo manual.";
+    case "DEVELOPER_ERROR":
+      return "Configuración pendiente en Google Cloud: falta el cliente OAuth Android (paquete com.eze2122.subly + SHA-1 de la firma), la Gmail API o tu cuenta como usuario de prueba.";
+    case "NETWORK_ERROR":
+      return "Sin conexión con Google. Revisá internet e intentá de nuevo.";
+    default:
+      return "No se pudo completar la autorización con Google. Intentá nuevamente.";
+  }
+}
+
+let cache: { token: string; exp: number } | null = null;
+
+async function callNative(interactive: boolean) {
+  if (!SublyGoogleAuth) throw new ReauthRequired();
   try {
-    if (t) await revokeAsync({ token: t.refreshToken ?? t.accessToken }, discovery);
+    return await SublyGoogleAuth.authorize(interactive);
+  } catch (e: any) {
+    if (e?.code === "INTERACTION_REQUIRED") throw new ReauthRequired();
+    throw new OAuthError(String(e?.code ?? "AUTH_FAILED"));
+  }
+}
+
+/** Shows Google's account/consent UI when needed. Throws OAuthError on failure. */
+export async function authorizeInteractive() {
+  const r = await callNative(true);
+  if (!r.accessToken || !r.grantedScopes.includes(GMAIL_SCOPE)) throw new OAuthError("SCOPE_DENIED");
+  cache = { token: r.accessToken, exp: Date.now() + TOKEN_TTL_MS };
+}
+
+/** Silent token (no UI). `force` evicts the cached token first (after a 401). */
+export async function getAccessToken(force = false): Promise<string> {
+  if (!force && cache && cache.exp > Date.now()) return cache.token;
+  if (cache) {
+    const old = cache.token;
+    cache = null;
+    if (force) await SublyGoogleAuth?.clearToken(old).catch(() => null);
+  }
+  let r;
+  try {
+    r = await callNative(false);
+  } catch (e) {
+    if (e instanceof OAuthError) throw new ReauthRequired();
+    throw e;
+  }
+  if (!r.accessToken || !r.grantedScopes.includes(GMAIL_SCOPE)) throw new ReauthRequired();
+  cache = { token: r.accessToken, exp: Date.now() + TOKEN_TTL_MS };
+  return r.accessToken;
+}
+
+/** Revokes the grant at Google (best effort, revokes the whole app grant) and clears local tokens. */
+export async function revokeAndClear() {
+  let token = cache?.token ?? null;
+  if (!token) token = await callNative(false).then((r) => r.accessToken).catch(() => null);
+  try {
+    if (token) {
+      await fetch("https://oauth2.googleapis.com/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `token=${encodeURIComponent(token)}`,
+      });
+    }
   } finally {
-    await storage.secureRemove(TOKEN_KEY);
+    if (token) await SublyGoogleAuth?.clearToken(token).catch(() => null);
+    cache = null;
+    await storage.secureRemove(LEGACY_TOKEN_KEY);
   }
 }

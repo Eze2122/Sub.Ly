@@ -51,6 +51,9 @@ export const STATUS_LABEL: Record<ServiceStatus, string> = {
 
 export type Source = "manual" | "gmail";
 
+export type Usage = "high" | "medium" | "low";
+export const USAGE_LABEL: Record<Usage, string> = { high: "Lo uso mucho", medium: "A veces", low: "Lo uso poco" };
+
 export type Service = {
   id: string;
   name: string;
@@ -74,6 +77,8 @@ export type Service = {
   source: Source;
   sourceRef?: string | null;
   notes?: string;
+  /** Uso declarado por el usuario (nunca inferido). */
+  usage?: Usage | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": ["subly", "com.eze2122.subly"],
+    "scheme": "subly",
     "userInterfaceStyle": "light",
     "backgroundColor": "#0B1528",
     "ios": {

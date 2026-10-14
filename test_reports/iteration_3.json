@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 3 frontend verification (viewport 390x844). All six requested flows pass. (1) Savings card: Created ServA USD monthly 1.000,00 usage=low -> reports-savings-total-USD shows 'USD 12.000,00' and reports-savings-row-<A>. Created ServB ARS quarterly 30.000 with no usage -> appears under reports-savings-unrated with chips reports-savings-usage-<B>-{high,medium,low}. Tapping reports-savings-usage-<B>-low adds ARS row and shows reports-savings-total-ARS '$ 120.000,00' separately from USD (no currency mixing). Values persist after reload (USD 12.000,00 and $ 120.000,00). (2) Service detail shows 'Uso declarado: Lo uso poco' matching USAGE_LABEL[low]. (3) Cancelled service excluded: cancelling the only usage=low service via service-detail-cancel + cancel-sheet-confirm removes it from savings card (card returns null when recurringCount=0, 'No hay servicios recurrentes activos'). (4) Privacy screen loads sections including '6. Uso limitado de los datos de Google', mentions 'gmail.readonly', contact 'ezequiel21lv@gmail.com', and privacy-url 'https://eze2122.github.io/-subly-privacy/privacy.html'. (5) Gmail screen: no crash, status 'No conectado', notice gmail-unavailable 'Disponible en Android · La conexión con Gmail está disponible en la app de Android.', gmail-connect-button aria-disabled=true, never shows 'Conectado'. (6) Regression: create/save flow works, service detail loads with Confirmar pago / Marcar como cancelado, backup-export-csv testID present. Form segmented control testID service-form-usage with options -none/-high/-medium/-low verified. Non-blocking RN-Web warnings persist (shadow* deprecated) - cosmetic only.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "RN-Web deprecation warnings", "issue": "Non-blocking warnings in web preview: '\"shadow*\" style props are deprecated. Use \"boxShadow\"'. Cosmetic for web only; irrelevant on native Android build."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_3.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "src/domain/stats.ts savingsSummary correctly excludes cancelled services and recurring-ended services; annual uses monthlyEquivalent(s)*12 per currency with no cross-currency mixing (CurrencyTotals keyed by s.currency). Verified: USD 1.000,00 monthly -> 12.000,00/yr, ARS 30.000 quarterly -> 120.000,00/yr (30.000*4).",
+  "src/components/SavingsCard.tsx returns null when recurringCount=0 (card disappears when all are cancelled) - matches observed behavior.",
+    "app/service/form.tsx Segmented testID 'service-form-usage' with options 'none/high/medium/low' maps to data-testid 'service-form-usage-<id>' - verified present in DOM.",
+    "app/service/[id].tsx shows 'Uso declarado' with USAGE_LABEL mapping (low -> 'Lo uso poco').",
+    "app/privacy.tsx renders PRIVACY_SECTIONS and PRIVACY_URL from src/domain/privacyPolicy.ts; section '6. Uso limitado de los datos de Google' includes Limited Use language in both ES and EN.",
+    "src/gmail/oauth.ts oauthAvailability() returns {ok:false, reason:'platform'} on web -> UI correctly surfaces notice and disables button; no 'email' scope present (only gmail.readonly)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "Transient browser-local services created and removed per playwright context (localStorage key 'subly.state').",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Public URL: https://subly-preview-1.preview.emergentagent.com. Viewport 390x844. Service form testIDs for Iteration 3 Segmented usage: service-form-usage, service-form-usage-{none|high|medium|low}. Reports savings testIDs: reports-savings, reports-savings-total-<CUR>, reports-savings-row-<id>, reports-savings-unrated, reports-savings-usage-<id>-<high|medium|low>, reports-savings-empty, reports-savings-converted. SavingsCard renders only when recurringCount>0. Date picker in form opens on tapping service-form-next-due; use get_by_text('Hoy', exact=True) to pick today then Escape to dismiss. Cancel flow testIDs: service-detail-cancel -> cancel-sheet-confirm. Gmail connect button is disabled via aria-disabled=true on web (not the HTML disabled attribute).",
+  "rca_of_issue": "No bugs."
+}
