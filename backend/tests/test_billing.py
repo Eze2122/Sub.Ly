@@ -41,12 +41,72 @@ def test_verify_validates_input(client):
     assert client.post("/api/billing/verify", json={"purchaseToken": "short", "productId": "p"}).status_code == 422
 
 
+FAKE_SA = '{"type": "service_account", "client_email": "test@example.iam.gserviceaccount.com", "private_key": "not-a-real-key"}'
+
+
 def _configure(monkeypatch, tmp_path):
-    f = tmp_path / "sa.json"
-    f.write_text("{}")
-    monkeypatch.setattr(server, "PLAY_PACKAGE_NAME", "com.example.app")
-    monkeypatch.setattr(server, "PLAY_SUBSCRIPTION_ID", "subly_monthly")
-    monkeypatch.setattr(server, "PLAY_SERVICE_ACCOUNT_FILE", str(f))
+    monkeypatch.setattr(server, "PLAY_PACKAGE_NAME", "com.eze2122.subly")
+    monkeypatch.setattr(server, "PLAY_SUBSCRIPTION_ID", "subly_premium_monthly")
+    monkeypatch.setattr(server, "PLAY_BASE_PLAN_ID", "monthly")
+    monkeypatch.setattr(server, "PLAY_SERVICE_ACCOUNT_JSON", FAKE_SA)
+    monkeypatch.setattr(server, "PLAY_SERVICE_ACCOUNT_FILE", "")
+
+
+def _line(product="subly_premium_monthly", base_plan="monthly", days=10, **extra):
+    return {"productId": product, "expiryTime": future(days), "offerDetails": {"basePlanId": base_plan, **extra}}
+
+
+def test_default_identifiers():
+    assert server.EXPECTED_PACKAGE == "com.eze2122.subly"
+    assert os.environ.get("PLAY_SUBSCRIPTION_ID") or server.PLAY_SUBSCRIPTION_ID == "subly_premium_monthly"
+    assert os.environ.get("PLAY_BASE_PLAN_ID") or server.PLAY_BASE_PLAN_ID == "monthly"
+
+
+def test_config_configured_with_json(client, monkeypatch, tmp_path):
+    _configure(monkeypatch, tmp_path)
+    r = client.get("/api/billing/config").json()
+    assert r == {"configured": True, "productId": "subly_premium_monthly", "basePlanId": "monthly", "packageName": "com.eze2122.subly", "missing": []}
+
+
+def test_service_account_json_base64_and_invalid(monkeypatch, tmp_path):
+    _configure(monkeypatch, tmp_path)
+    import base64 as b64
+    monkeypatch.setattr(server, "PLAY_SERVICE_ACCOUNT_JSON", b64.b64encode(FAKE_SA.encode()).decode())
+    assert server.service_account_info()["client_email"].startswith("test@")
+    for bad in ("not json", '{"type": "authorized_user"}', '{"type": "service_account"}'):
+        monkeypatch.setattr(server, "PLAY_SERVICE_ACCOUNT_JSON", bad)
+        assert server.service_account_info() is None
+        assert "PLAY_SERVICE_ACCOUNT_JSON" in server.missing_config()
+
+
+def test_wrong_package_not_configured(monkeypatch, tmp_path):
+    _configure(monkeypatch, tmp_path)
+    monkeypatch.setattr(server, "PLAY_PACKAGE_NAME", "com.other.app")
+    assert "PLAY_PACKAGE_NAME" in server.missing_config()
+
+
+def test_wrong_base_plan_rejected(client, monkeypatch, tmp_path):
+    _configure(monkeypatch, tmp_path)
+
+    async def fake_fetch(token):
+        return {"subscriptionState": "SUBSCRIPTION_STATE_ACTIVE", "lineItems": [_line(base_plan="yearly")]}
+
+    monkeypatch.setattr(server, "fetch_subscription", fake_fetch)
+    r = client.post("/api/billing/verify", json={"purchaseToken": "token-123456789012", "productId": "subly_premium_monthly"})
+    assert r.status_code == 403
+
+
+def test_valid_purchase_granted(client, monkeypatch, tmp_path):
+    _configure(monkeypatch, tmp_path)
+
+    async def fake_fetch(token):
+        return {"subscriptionState": "SUBSCRIPTION_STATE_ACTIVE", "acknowledgementState": "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED", "lineItems": [_line()]}
+
+    monkeypatch.setattr(server, "fetch_subscription", fake_fetch)
+    r = client.post("/api/billing/verify", json={"purchaseToken": "token-valid-123456789", "productId": "subly_premium_monthly"})
+    assert r.status_code == 200 and r.json()["entitled"] is True and r.json()["state"] == "active"
+    from pymongo import MongoClient
+    MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]].entitlements.delete_one({"token_hash": server.token_hash("token-valid-123456789")})
 
 
 def test_forged_token_rejected(client, monkeypatch, tmp_path):
@@ -56,7 +116,7 @@ def test_forged_token_rejected(client, monkeypatch, tmp_path):
         return None  # Google does not recognise the token
 
     monkeypatch.setattr(server, "fetch_subscription", fake_fetch)
-    r = client.post("/api/billing/verify", json={"purchaseToken": "forged-token-123456", "productId": "subly_monthly"})
+    r = client.post("/api/billing/verify", json={"purchaseToken": "forged-token-123456", "productId": "subly_premium_monthly"})
     assert r.status_code == 403
 
 
@@ -70,10 +130,10 @@ def test_token_for_other_product_rejected(client, monkeypatch, tmp_path):
     _configure(monkeypatch, tmp_path)
 
     async def fake_fetch(token):
-        return {"subscriptionState": "SUBSCRIPTION_STATE_ACTIVE", "lineItems": [{"productId": "another", "expiryTime": future()}]}
+        return {"subscriptionState": "SUBSCRIPTION_STATE_ACTIVE", "lineItems": [_line(product="another")]}
 
     monkeypatch.setattr(server, "fetch_subscription", fake_fetch)
-    r = client.post("/api/billing/verify", json={"purchaseToken": "token-123456789012", "productId": "subly_monthly"})
+    r = client.post("/api/billing/verify", json={"purchaseToken": "token-123456789012", "productId": "subly_premium_monthly"})
     assert r.status_code == 403
 
 
@@ -103,3 +163,9 @@ def test_evaluate_states(state, expiry, entitled, expected):
 def test_evaluate_trial():
     r = server.evaluate({"subscriptionState": "SUBSCRIPTION_STATE_ACTIVE", "lineItems": [{"productId": "p", "expiryTime": future(7), "offerDetails": {"offerId": "free-trial-7d"}}]}, "p")
     assert r["entitled"] and r["state"] == "trial"
+
+
+def test_evaluate_base_plan():
+    sub = {"subscriptionState": "SUBSCRIPTION_STATE_ACTIVE", "lineItems": [_line()]}
+    assert server.evaluate(sub, "subly_premium_monthly", "monthly")["entitled"] is True
+    assert server.evaluate(sub, "subly_premium_monthly", "yearly")["reason"] == "base_plan_mismatch"

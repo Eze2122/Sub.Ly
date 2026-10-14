@@ -16,7 +16,7 @@ const INSTALL_KEY = "subly.installId";
 
 export type PlayState = "active" | "trial" | "grace" | "on_hold" | "paused" | "canceled_active" | "expired" | "none";
 
-export type BillingConfig = { configured: boolean; productId: string | null; packageName: string | null; missing: string[] };
+export type BillingConfig = { configured: boolean; productId: string | null; basePlanId: string | null; packageName: string | null; missing: string[] };
 
 export type Entitlement = {
   premium: boolean;
@@ -124,7 +124,7 @@ export async function refreshEntitlement(opts: { restore?: boolean } = {}) {
   }
   const devUnlocked = !config.configured && __DEV__;
   set({ config, devUnlocked });
-  if (!config.configured || !config.productId) {
+  if (!config.configured || !config.productId || !config.basePlanId) {
     set({ check: "not_configured", message: "Google Play Billing está pendiente de configuración." });
     return;
   }

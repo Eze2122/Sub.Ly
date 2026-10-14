@@ -30,12 +30,13 @@ export default function Premium() {
   const [buying, setBuying] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const productId = ent.config?.productId ?? null;
+  const basePlanId = ent.config?.basePlanId ?? null;
 
   useEffect(() => {
-    if (!ent.config?.configured || !productId) return;
+    if (!ent.config?.configured || !productId || !basePlanId) return;
     setLoadingOffer(true);
-    fetchOffer(productId).then(setOffer).catch(() => setOffer(null)).finally(() => setLoadingOffer(false));
-  }, [ent.config?.configured, productId]);
+    fetchOffer(productId, basePlanId).then(setOffer).catch(() => setOffer(null)).finally(() => setLoadingOffer(false));
+  }, [ent.config?.configured, productId, basePlanId]);
 
   useEffect(() => onPurchase(
     async (p) => {

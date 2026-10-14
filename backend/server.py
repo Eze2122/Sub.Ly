@@ -33,9 +33,15 @@ log = logging.getLogger("subly")
 client = AsyncIOMotorClient(os.environ["MONGO_URL"])
 db = client[os.environ["DB_NAME"]]
 
-# Optional (pending external configuration). Missing values => "not_configured".
-PLAY_PACKAGE_NAME = os.environ.get("PLAY_PACKAGE_NAME", "").strip()
-PLAY_SUBSCRIPTION_ID = os.environ.get("PLAY_SUBSCRIPTION_ID", "").strip()
+# Public Play identifiers (overridable by env). Credentials are env-only; missing
+# credentials => "not_configured" and Premium is never granted.
+EXPECTED_PACKAGE = "com.eze2122.subly"
+PLAY_PACKAGE_NAME = os.environ.get("PLAY_PACKAGE_NAME", EXPECTED_PACKAGE).strip()
+PLAY_SUBSCRIPTION_ID = os.environ.get("PLAY_SUBSCRIPTION_ID", "subly_premium_monthly").strip()
+PLAY_BASE_PLAN_ID = os.environ.get("PLAY_BASE_PLAN_ID", "monthly").strip()
+# Service account key: PLAY_SERVICE_ACCOUNT_JSON (raw JSON or base64 of it, from the
+# deployment's secret store) takes precedence over PLAY_SERVICE_ACCOUNT_FILE (path).
+PLAY_SERVICE_ACCOUNT_JSON = os.environ.get("PLAY_SERVICE_ACCOUNT_JSON", "").strip()
 PLAY_SERVICE_ACCOUNT_FILE = os.environ.get("PLAY_SERVICE_ACCOUNT_FILE", "").strip()
 PUBSUB_AUDIENCE = os.environ.get("PUBSUB_AUDIENCE", "").strip()
 PUBSUB_PUSH_SERVICE_ACCOUNT = os.environ.get("PUBSUB_PUSH_SERVICE_ACCOUNT", "").strip()
@@ -92,14 +98,34 @@ class VerifyIn(BaseModel):
 
 
 # ---------------------------------------------------------------- helpers
+def service_account_info() -> Optional[dict]:
+    """Parses PLAY_SERVICE_ACCOUNT_JSON (raw or base64). Never logs its content."""
+    raw = PLAY_SERVICE_ACCOUNT_JSON
+    if not raw:
+        return None
+    try:
+        if not raw.startswith("{"):
+            raw = base64.b64decode(raw).decode()
+        info = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(info, dict) or info.get("type") != "service_account" or not info.get("client_email") or not info.get("private_key"):
+        return None
+    return info
+
+
 def missing_config() -> list[str]:
     missing = []
-    if not PLAY_PACKAGE_NAME:
+    if PLAY_PACKAGE_NAME != EXPECTED_PACKAGE:
         missing.append("PLAY_PACKAGE_NAME")
     if not PLAY_SUBSCRIPTION_ID:
         missing.append("PLAY_SUBSCRIPTION_ID")
-    if not PLAY_SERVICE_ACCOUNT_FILE or not Path(PLAY_SERVICE_ACCOUNT_FILE).is_file():
-        missing.append("PLAY_SERVICE_ACCOUNT_FILE")
+    if not PLAY_BASE_PLAN_ID:
+        missing.append("PLAY_BASE_PLAN_ID")
+    has_json = service_account_info() is not None
+    has_file = bool(PLAY_SERVICE_ACCOUNT_FILE) and Path(PLAY_SERVICE_ACCOUNT_FILE).is_file()
+    if not has_json and not has_file:
+        missing.append("PLAY_SERVICE_ACCOUNT_JSON")
     return missing
 
 
@@ -116,7 +142,11 @@ def play_access_token() -> str:
     from google.oauth2 import service_account
 
     if _creds is None:
-        _creds = service_account.Credentials.from_service_account_file(PLAY_SERVICE_ACCOUNT_FILE, scopes=[ANDROID_PUBLISHER_SCOPE])
+        info = service_account_info()
+        if info is not None:
+            _creds = service_account.Credentials.from_service_account_info(info, scopes=[ANDROID_PUBLISHER_SCOPE])
+        else:
+            _creds = service_account.Credentials.from_service_account_file(PLAY_SERVICE_ACCOUNT_FILE, scopes=[ANDROID_PUBLISHER_SCOPE])
     if not _creds.valid:
         _creds.refresh(GRequest())
     return _creds.token
@@ -155,13 +185,18 @@ PLAY_STATE_MAP = {
 }
 
 
-def evaluate(sub: dict, expected_product: str, now: Optional[datetime] = None) -> dict:
+def evaluate(sub: dict, expected_product: str, expected_base_plan: Optional[str] = None, now: Optional[datetime] = None) -> dict:
     """Pure evaluation of a subscriptionsv2 resource. Grants only when product,
-    state and expiry all match. A CANCELED subscription stays usable until expiry."""
+    base plan, state and expiry all match. A CANCELED subscription stays usable until expiry.
+    The package is enforced by the API URL (tokens from other apps are not found)."""
     now = now or datetime.now(timezone.utc)
     items = [li for li in sub.get("lineItems") or [] if li.get("productId") == expected_product]
     if not items:
         return {"entitled": False, "state": "none", "expiryTime": None, "autoRenewing": None, "reason": "product_mismatch"}
+    if expected_base_plan:
+        items = [li for li in items if (li.get("offerDetails") or {}).get("basePlanId") == expected_base_plan]
+        if not items:
+            return {"entitled": False, "state": "none", "expiryTime": None, "autoRenewing": None, "reason": "base_plan_mismatch"}
     item = max(items, key=lambda li: li.get("expiryTime") or "")
     expiry = item.get("expiryTime")
     play_state = sub.get("subscriptionState", "")
@@ -216,6 +251,7 @@ async def billing_config():
     return {
         "configured": not missing,
         "productId": PLAY_SUBSCRIPTION_ID or None,
+        "basePlanId": PLAY_BASE_PLAN_ID or None,
         "packageName": PLAY_PACKAGE_NAME or None,
         "missing": missing,
     }
@@ -233,8 +269,8 @@ async def billing_verify(body: VerifyIn, request: Request):
     sub = await fetch_subscription(body.purchaseToken)
     if sub is None:
         raise HTTPException(403, "Google Play no reconoce esta compra.")
-    result = evaluate(sub, PLAY_SUBSCRIPTION_ID)
-    if result.get("reason") == "product_mismatch":
+    result = evaluate(sub, PLAY_SUBSCRIPTION_ID, PLAY_BASE_PLAN_ID)
+    if result.get("reason") in ("product_mismatch", "base_plan_mismatch"):
         raise HTTPException(403, "La compra no corresponde a la suscripción de Subly.")
     if result["entitled"] and result.get("ackState") == "ACKNOWLEDGEMENT_STATE_PENDING":
         await acknowledge(PLAY_SUBSCRIPTION_ID, body.purchaseToken)
@@ -290,7 +326,9 @@ async def billing_rtdn(request: Request):
     sub = await fetch_subscription(token)
     if sub is None:
         return {"ok": True}
-    result = evaluate(sub, PLAY_SUBSCRIPTION_ID)
+    result = evaluate(sub, PLAY_SUBSCRIPTION_ID, PLAY_BASE_PLAN_ID)
+    if result.get("reason"):
+        return {"ok": True, "ignored": result["reason"]}
     await db.entitlements.update_one(
         {"token_hash": token_hash(token)},
         {"$set": {"state": result["state"], "play_state": result.get("playState", ""), "expiry_time": result["expiryTime"], "auto_renewing": result["autoRenewing"], "product_id": PLAY_SUBSCRIPTION_ID, "updated_at": datetime.now(timezone.utc).isoformat()}},

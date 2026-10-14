@@ -30,7 +30,7 @@ Permiso único solicitado: `https://www.googleapis.com/auth/gmail.readonly`. El 
 | Paquete | `frontend/app.json` → `android.package` = `com.eze2122.subly` |
 | Permiso Gmail | `frontend/modules/subly-google-auth/android/.../SublyGoogleAuthModule.kt` y `frontend/src/gmail/oauth.ts` |
 | SHA-1 / cliente Android | Solo en Google Cloud |
-| Producto de suscripción y validación | Backend: `PLAY_SUBSCRIPTION_ID`, `PLAY_PACKAGE_NAME`, `PLAY_SERVICE_ACCOUNT_FILE` |
+| Producto de suscripción y validación | Backend: `PLAY_PACKAGE_NAME` (`com.eze2122.subly`), `PLAY_SUBSCRIPTION_ID` (`subly_premium_monthly`), `PLAY_BASE_PLAN_ID` (`monthly`) —valores por defecto— y el secreto `PLAY_SERVICE_ACCOUNT_JSON` |
 
 ## Prueba real (en el teléfono, con la compilación instalada)
 1. Ajustes → Conexión con Gmail → **Conectar con Google** → elegir la cuenta de prueba → aceptar lectura de Gmail.
@@ -55,11 +55,11 @@ Permiso único solicitado: `https://www.googleapis.com/auth/gmail.readonly`. El 
 2. *Monetizar → Productos → Suscripciones* → crear suscripción (ID a elección, p. ej. `subly_premium_mensual`) → **plan base mensual con renovación automática**, precio **US$ 2** y precios regionales (Play convierte o los fijás vos).
 3. En el plan base, crear **oferta de prueba gratuita de 7 días** (fase gratuita P7D) para nuevos clientes. Recomendado: etiqueta de oferta `trial` (Subly la usa para mostrar "Prueba gratuita activa").
 4. Configurá **cuentas de prueba de licencias** (*Configuración → Pruebas de licencias*).
-5. Copiá el ID real a `PLAY_SUBSCRIPTION_ID` y el paquete a `PLAY_PACKAGE_NAME`.
+5. IDs usados por Subly: suscripción `subly_premium_monthly`, plan básico `monthly` (la app solo ofrece ese plan y el servidor rechaza compras de otro plan o producto).
 
 ### Google Play Developer API (backend)
 1. En Google Cloud, habilitá *Google Play Android Developer API*.
-2. Creá una **cuenta de servicio** sin roles de proyecto; generá una clave JSON y guardala **solo** en el servidor (`PLAY_SERVICE_ACCOUNT_FILE`).
+2. Creá una **cuenta de servicio** sin roles de proyecto; generá una clave JSON y cargá su contenido (o su base64) **solo** como secreto del despliegue en `PLAY_SERVICE_ACCOUNT_JSON`. Nunca en el repositorio.
 3. Play Console → *Usuarios y permisos → Invitar usuario* → email de la cuenta de servicio → permisos de la app: **Ver información financiera** y **Gestionar pedidos y suscripciones** (mínimo necesario).
 4. Puede tardar hasta 24 h en propagarse.
 

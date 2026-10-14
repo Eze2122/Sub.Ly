@@ -6,7 +6,7 @@ export async function connect() {
   return false;
 }
 export type PlayOffer = { productId: string; title: string; basePrice: string | null; trialDays: number | null; offerToken: string; offerId: string | null };
-export async function fetchOffer(_id: string): Promise<PlayOffer | null> {
+export async function fetchOffer(_id: string, _basePlanId: string): Promise<PlayOffer | null> {
   return null;
 }
 export async function purchase(_a: string, _b: string, _c: string) {

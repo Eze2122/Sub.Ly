@@ -42,15 +42,16 @@ function periodDays(iso: string) {
   return Number(m[1] ?? 0) * 365 + Number(m[2] ?? 0) * 30 + Number(m[3] ?? 0) * 7 + Number(m[4] ?? 0);
 }
 
-/** Reads the real subscription offer from Google Play (price + free trial phase). */
-export async function fetchOffer(productId: string): Promise<PlayOffer | null> {
+/** Reads the real offer of the given base plan from Google Play (price + optional free trial). */
+export async function fetchOffer(productId: string, basePlanId: string): Promise<PlayOffer | null> {
   if (!(await connect())) return null;
   const products = await IAP.fetchProducts({ skus: [productId], type: "subs" });
   const p = (products ?? []).find((x: any) => x.id === productId);
   if (!p) return null;
-  const offers: any[] = p.subscriptionOffers ?? [];
+  // Only offers of the configured base plan; Play returns only offers the user is eligible for.
+  const offers: any[] = (p.subscriptionOffers ?? []).filter((o: any) => o.basePlanIdAndroid === basePlanId);
   const withTrial = offers.find((o) => (o.pricingPhasesAndroid?.pricingPhaseList ?? []).some((ph: any) => Number(ph.priceAmountMicros) === 0));
-  const chosen = withTrial ?? offers[0];
+  const chosen = withTrial ?? offers.find((o) => o.id === basePlanId) ?? offers[0];
   if (!chosen?.offerTokenAndroid) return null;
   const phases: any[] = chosen.pricingPhasesAndroid?.pricingPhaseList ?? [];
   const free = phases.find((ph) => Number(ph.priceAmountMicros) === 0);

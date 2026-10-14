@@ -27,7 +27,7 @@ Fecha: junio 2026. Estado **honesto**: nada externo está declarado como operati
 | Política pública: https://eze2122.github.io/-subly-privacy/privacy.html (subir `docs/privacy.html` actualizado) | Pantalla de consentimiento OAuth y ficha de Play |
 | ID del producto de suscripción | `backend/.env` → `PLAY_SUBSCRIPTION_ID` |
 | Paquete para validación | `backend/.env` → `PLAY_PACKAGE_NAME` |
-| Clave JSON de la cuenta de servicio | Archivo fuera del repo; ruta en `PLAY_SERVICE_ACCOUNT_FILE` |
+| Clave JSON de la cuenta de servicio | Secreto del despliegue `PLAY_SERVICE_ACCOUNT_JSON` (JSON o base64); nunca en el repo. Alternativa: `PLAY_SERVICE_ACCOUNT_FILE` |
 | Pub/Sub (opcional) | `PUBSUB_AUDIENCE`, `PUBSUB_PUSH_SERVICE_ACCOUNT` |
 | URL definitiva del backend (HTTPS) | `EXPO_PUBLIC_BACKEND_URL` (Emergent la asigna al publicar) |
 
