@@ -65,7 +65,7 @@ def test_default_identifiers():
 def test_config_configured_with_json(client, monkeypatch, tmp_path):
     _configure(monkeypatch, tmp_path)
     r = client.get("/api/billing/config").json()
-    assert r == {"configured": True, "productId": "subly_premium_monthly", "basePlanId": "monthly", "packageName": "com.eze2122.subly", "missing": []}
+    assert r == {"configured": True, "productId": "subly_premium_monthly", "basePlanId": "monthly", "packageName": "com.eze2122.subly", "missing": [], "credentialStatus": "ok"}
 
 
 def test_service_account_json_base64_and_invalid(monkeypatch, tmp_path):
@@ -77,6 +77,19 @@ def test_service_account_json_base64_and_invalid(monkeypatch, tmp_path):
         monkeypatch.setattr(server, "PLAY_SERVICE_ACCOUNT_JSON", bad)
         assert server.service_account_info() is None
         assert "PLAY_SERVICE_ACCOUNT_JSON" in server.missing_config()
+
+
+def test_service_account_tolerant_formats(monkeypatch, tmp_path):
+    _configure(monkeypatch, tmp_path)
+    import base64 as b64
+    enc = b64.b64encode(("\ufeff" + FAKE_SA).encode()).decode()
+    variants = [f'"{FAKE_SA}"', "\ufeff" + FAKE_SA, enc[:20] + "\n" + enc[20:] + "\n", f"'{enc}'", enc.rstrip("=")]
+    for v in variants:
+        monkeypatch.setattr(server, "PLAY_SERVICE_ACCOUNT_JSON", v)
+        assert server.credential_status()[1] == "ok", repr(v[:5])
+    for v, code in (("", "absent"), ("%%%", "invalid_base64"), ("{bad", "invalid_json"), ('{"type": "x"}', "not_service_account"), ('{"type": "service_account"}', "incomplete_key")):
+        monkeypatch.setattr(server, "PLAY_SERVICE_ACCOUNT_JSON", v)
+        assert server.credential_status()[1] == code
 
 
 def test_wrong_package_not_configured(monkeypatch, tmp_path):

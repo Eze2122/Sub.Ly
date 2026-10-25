@@ -83,3 +83,9 @@ android-sdk/
 # Subly secrets (never commit). Real secrets go in the deployment secret store.
 *service-account*.json
 secrets/
+.env
+.env.*
+*.env
+credentials.json
+*.key
+.credentials

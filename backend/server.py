@@ -53,7 +53,7 @@ async def lifespan(_app):
     await db.entitlements.create_index("token_hash", unique=True)
     await db.rtdn_seen.create_index("messageId", unique=True)
     m = missing_config()
-    log.info("billing_configured=%s missing=%s", not m, ",".join(m))
+    log.info("billing_configured=%s missing=%s credential_status=%s", not m, ",".join(m), credential_status()[1])
     yield
     client.close()
 
@@ -98,20 +98,32 @@ class VerifyIn(BaseModel):
 
 
 # ---------------------------------------------------------------- helpers
-def service_account_info() -> Optional[dict]:
-    """Parses PLAY_SERVICE_ACCOUNT_JSON (raw or base64). Never logs its content."""
-    raw = PLAY_SERVICE_ACCOUNT_JSON
+def credential_status() -> tuple[Optional[dict], str]:
+    """Parses PLAY_SERVICE_ACCOUNT_JSON (raw JSON or base64, tolerating quotes, BOM and
+    line breaks). Returns (info, status). Status is a code only — never the content."""
+    raw = PLAY_SERVICE_ACCOUNT_JSON.strip().lstrip("\ufeff").strip().strip("'\"").strip()
     if not raw:
-        return None
+        return None, "absent"
+    if not raw.startswith("{"):
+        try:
+            compact = "".join(raw.split())
+            compact += "=" * (-len(compact) % 4)
+            raw = base64.b64decode(compact.replace("-", "+").replace("_", "/"), validate=True).decode("utf-8-sig").strip()
+        except Exception:
+            return None, "invalid_base64"
     try:
-        if not raw.startswith("{"):
-            raw = base64.b64decode(raw).decode()
         info = json.loads(raw)
     except Exception:
-        return None
-    if not isinstance(info, dict) or info.get("type") != "service_account" or not info.get("client_email") or not info.get("private_key"):
-        return None
-    return info
+        return None, "invalid_json"
+    if not isinstance(info, dict) or info.get("type") != "service_account":
+        return None, "not_service_account"
+    if not info.get("client_email") or not info.get("private_key"):
+        return None, "incomplete_key"
+    return info, "ok"
+
+
+def service_account_info() -> Optional[dict]:
+    return credential_status()[0]
 
 
 def missing_config() -> list[str]:
@@ -254,6 +266,7 @@ async def billing_config():
         "basePlanId": PLAY_BASE_PLAN_ID or None,
         "packageName": PLAY_PACKAGE_NAME or None,
         "missing": missing,
+        "credentialStatus": credential_status()[1],
     }
 
 
@@ -338,6 +351,11 @@ async def billing_rtdn(request: Request):
 
 
 app.include_router(api)
+
+
+@app.get("/health")
+async def root_health():
+    return {"ok": True}
 
 app.add_middleware(
     CORSMiddleware,
