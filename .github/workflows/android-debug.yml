@@ -1,4 +1,4 @@
-name: Android debug APK
+name: Android test APK
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-android:
-    name: Generate and build Android APK
+    name: Generate and build standalone Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -45,16 +45,16 @@ jobs:
         env:
           CI: "1"
 
-      - name: Build debug APK
+      - name: Build standalone release APK
         working-directory: frontend/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
         env:
           CI: "1"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: subly-android-debug-apk
-          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
+          name: subly-android-test-apk
+          path: frontend/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
