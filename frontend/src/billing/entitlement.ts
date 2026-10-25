@@ -9,7 +9,7 @@ import { storage } from "@/src/utils/storage";
 
 import { finish, iapAvailable, ownedPurchases } from "./iap";
 
-const API = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
+const API = "https://subly-preview-1.emergent.host/api";
 const CACHE_KEY = "subly.entitlement";
 const TOKEN_KEY = "subly.purchaseToken";
 const INSTALL_KEY = "subly.installId";
