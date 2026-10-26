@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build-android:
-    name: Generate and build Android App Bundle
+    name: Generate and build signed Android App Bundle
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -36,16 +36,59 @@ jobs:
       - name: Install JavaScript dependencies
         run: yarn install --non-interactive --no-progress
 
+      - name: Restore Sub.Ly upload key
+        working-directory: .
+        env:
+          SUBLY_UPLOAD_KEYSTORE_BASE64: ${{ secrets.SUBLY_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$SUBLY_UPLOAD_KEYSTORE_BASE64" || { echo "Missing GitHub secret SUBLY_UPLOAD_KEYSTORE_BASE64"; exit 1; }
+          echo "$SUBLY_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/subly-upload-key.jks"
+          test -s "$RUNNER_TEMP/subly-upload-key.jks"
+
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
         env:
           CI: "1"
+
+      - name: Configure release signing
+        working-directory: .
+        env:
+          SUBLY_UPLOAD_STORE_FILE: ${{ runner.temp }}/subly-upload-key.jks
+          SUBLY_UPLOAD_STORE_PASSWORD: ${{ secrets.SUBLY_UPLOAD_KEYSTORE_PASSWORD }}
+          SUBLY_UPLOAD_KEY_PASSWORD: ${{ secrets.SUBLY_UPLOAD_KEY_PASSWORD }}
+          SUBLY_UPLOAD_KEY_ALIAS: ${{ secrets.SUBLY_UPLOAD_KEY_ALIAS }}
+        run: |
+          test -n "$SUBLY_UPLOAD_STORE_PASSWORD" || { echo "Missing GitHub secret SUBLY_UPLOAD_KEYSTORE_PASSWORD"; exit 1; }
+          test -n "$SUBLY_UPLOAD_KEY_PASSWORD" || { echo "Missing GitHub secret SUBLY_UPLOAD_KEY_PASSWORD"; exit 1; }
+          test -n "$SUBLY_UPLOAD_KEY_ALIAS" || { echo "Missing GitHub secret SUBLY_UPLOAD_KEY_ALIAS"; exit 1; }
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, os
+          p = Path("frontend/android/app/build.gradle")
+          s = p.read_text()
+          if "signingConfigs {" not in s:
+              s = re.sub(
+                  r"(\n\s*)buildTypes\s*\{",
+                  r'\1signingConfigs {\n        release {\n            storeFile file(System.getenv("SUBLY_UPLOAD_STORE_FILE"))\n            storePassword System.getenv("SUBLY_UPLOAD_STORE_PASSWORD")\n            keyAlias System.getenv("SUBLY_UPLOAD_KEY_ALIAS")\n            keyPassword System.getenv("SUBLY_UPLOAD_KEY_PASSWORD")\n        }\n    }\n\1buildTypes {',
+                  s,
+                  count=1
+              )
+          pattern = r"(release\s*\{[\s\S]*?signingConfig\s+)signingConfigs\.debug"
+          s, n = re.subn(pattern, r"\1signingConfigs.release", s, count=1)
+          if n != 1:
+              raise SystemExit("Could not locate release signingConfig in app/build.gradle; refusing to build an incorrectly signed AAB.")
+          p.write_text(s)
+          PY
 
       - name: Build Android App Bundle
         working-directory: frontend/android
         run: ./gradlew bundleRelease --no-daemon
         env:
           CI: "1"
+          SUBLY_UPLOAD_STORE_FILE: ${{ runner.temp }}/subly-upload-key.jks
+          SUBLY_UPLOAD_STORE_PASSWORD: ${{ secrets.SUBLY_UPLOAD_KEYSTORE_PASSWORD }}
+          SUBLY_UPLOAD_KEY_PASSWORD: ${{ secrets.SUBLY_UPLOAD_KEY_PASSWORD }}
+          SUBLY_UPLOAD_KEY_ALIAS: ${{ secrets.SUBLY_UPLOAD_KEY_ALIAS }}
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
